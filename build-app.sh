@@ -1,5 +1,6 @@
 #!/bin/bash
-# 打包 ad-hoc 签名的 CopyPath.app 与 dmg 安装镜像，并把 .app 装到 ~/Applications。
+# 打包 CopyPath.app 与 dmg 安装镜像：dmg 输出到 ~/Downloads，.app 装到 ~/Applications。
+# 只需本机使用，不做开发者签名与公证。
 #
 # 三条硬约束：
 #   1) 项目在 /Volumes/SanDis1TB 外置盘上，target 默认放内部盘（可用环境变量覆盖）。
@@ -83,6 +84,8 @@ plutil -convert binary1 Info.plist -o "$APP_BUNDLE/Contents/Info.plist"
 plutil -insert CFBundleShortVersionString -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist"
 plutil -insert CFBundleVersion -string "$VERSION" "$APP_BUNDLE/Contents/Info.plist"
 
+# 这里的 ad-hoc 签名不是分发签名（无开发者证书、不公证），而是运行前提：
+# Apple Silicon 上未签名的二进制会被内核直接 SIGKILL，实测 exit 137。
 codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
 
 # 自检：任一不符就别把坏包装进 ~/Applications。
@@ -95,8 +98,8 @@ codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
 codesign --verify --strict --verbose=2 "$APP_BUNDLE"
 
 # dmg：卷里只放 .app 和一个指向 /Applications 的软链接，拖一下就算装好。
-DMG="$PROJECT_DIR/release/${APP_NAME}_${VERSION}_universal.dmg"
-mkdir -p "$(dirname "$DMG")"
+# 产物落在 ~/Downloads，不进仓库目录。
+DMG="$HOME/Downloads/${APP_NAME}_${VERSION}_universal.dmg"
 STAGE="$CARGO_TARGET_DIR/release/dmg-staging"
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -R "$APP_BUNDLE" "$STAGE/"

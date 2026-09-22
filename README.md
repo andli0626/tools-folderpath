@@ -10,9 +10,12 @@ Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osa
 
 ## 安装
 
-拿到 `release/CopyPath_1.0.0_universal.dmg` 后双击挂载，把 **CopyPath.app 拖到 Applications** 即可。
-应用是 ad-hoc 签名（`codesign -s -`）而非公证，首次打开会被 Gatekeeper 拦住，用
-**右键 → 打开 → 再点一次「打开」**过掉，之后正常双击。
+本机打包直接产出到 **`~/Downloads/CopyPath_1.0.0_universal.dmg`**。双击挂载，把
+**CopyPath.app 拖到 Applications** 即可。
+
+本机生成的 dmg 不带隔离属性（`com.apple.quarantine`），所以双击就能打开，不需要额外的
+Gatekeeper 步骤。只有当 dmg 经过浏览器下载或隔空投送转到别的机器时才可能被拦，那时用
+**右键 → 打开 → 再点一次「打开」**过掉。
 
 从源码打包（同时产出 `.app` 与 `.dmg`，并把 `.app` 装进 `~/Applications` 后启动）：
 
@@ -22,6 +25,10 @@ Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osa
 
 产物必须装在内部盘的 `~/Applications`，不要留在外置盘：开机自启的 LaunchAgent 会把 `.app`
 的绝对路径写死，开机时盘没挂载自启就静默失效。
+
+关于签名：本项目不做开发者证书签名，也不做公证。但 `build-app.sh` 里那次
+`codesign --sign -`（ad-hoc）**不能删** —— 它不是分发签名，而是运行前提，
+Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 137）。
 
 ## 用法
 
@@ -124,3 +131,7 @@ tccutil reset AppleEvents com.lilin.folderpath
 - 选中 `.framework`、`.bundle` 这类包目录时，访达报的类别是 `folder`，会复制包自身路径。
 - 文件名里含换行的条目会被丢弃并在 stderr 告警，而不是拼进上一条路径。
 - 全局快捷键是编译期常量，没有设置界面。
+
+## 文档
+
+发布与变更记录见 [docs/README.md](docs/README.md)。本 README 描述当前状态，历史交付记录不写在这里。
