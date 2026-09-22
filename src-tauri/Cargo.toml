@@ -1,0 +1,27 @@
+[package]
+name = "copypath"
+version = "1.0.0"
+description = "CopyPath - 一键获取访达所选文件夹的绝对路径"
+edition = "2021"
+
+[lib]
+name = "copypath_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.3"
+tauri-plugin-autostart = "2"
+arboard = "3"
+notify-rust = { version = "4", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+fs2 = "0.4"
+
+# notify-rust 把 macos 模块设为私有，只有这条直接依赖能提前占掉它的 bundle id 探测。
+# 版本必须落在 notify-rust 4.18 同一 caret 区间里，否则会各编一份、Once 互不相干。
+[target.'cfg(target_os = "macos")'.dependencies]
+mac-notification-sys = "0.6.15"

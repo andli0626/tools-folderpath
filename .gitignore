@@ -1,0 +1,6 @@
+/dist_history
+.DS_Store
+
+# cargo/tauri 产物：target 通过 CARGO_TARGET_DIR 指到内部盘，这里兜底防误提交
+src-tauri/target/
+src-tauri/gen/schemas/
