@@ -90,6 +90,9 @@ header{position:sticky;top:0;z-index:50;background:hsl(from var(--bg) h s l / .8
 .hero-cta{display:flex;gap:var(--sp-2);flex-wrap:wrap}
 .hero-meta{display:flex;gap:var(--sp-3);margin-top:var(--sp-4);color:var(--ink-3);font-size:13.5px;flex-wrap:wrap}
 .hero-meta b{color:var(--ink-2)}
+.repo-line{margin-top:10px;color:var(--ink-3);font-size:13.5px}
+.repo-line a{color:var(--brand);text-decoration:none;font-family:var(--mono);font-size:12.5px}
+.repo-line a:hover{text-decoration:underline}
 
 /* 模拟窗口 */
 .mock-wrap{position:relative}
@@ -202,6 +205,7 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
             <span><b>~3.9 MB</b> 安装包</span>
             <span><b>0</b> 网络请求</span>
           </div>
+          <div class="repo-line">开源地址：<a href="http://192.168.0.200/lil/tools-folderpath">http://192.168.0.200/lil/tools-folderpath</a></div>
         </div>
         <div class="mock-wrap" aria-hidden="true">
           <div class="toast">
@@ -292,7 +296,9 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
             <h3>获取应用</h3>
             <p>双击挂载 <code style="font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px">CopyPath_1.1.5_universal.dmg</code>，把卷里的 <b>CopyPath.app</b>（想要工具栏按钮就把 <b>CopyPath Toolbar.app</b> 也带上）拖进 <b>应用程序</b> 文件夹。</p>
             <div class="code"><button class="copy-btn" type="button">复制</button><pre># 或者：从源码打包（自动产出 .app 与 .dmg 并安装启动）
-./build-app.sh</pre></div>
+# 开源仓库：http://192.168.0.200/lil/tools-folderpath
+git clone http://192.168.0.200/lil/tools-folderpath
+cd tools-folderpath && ./build-app.sh</pre></div>
           </div>
         </div>
         <div class="step">
@@ -375,7 +381,7 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
   <div class="wrap foot-grid">
     <span>CopyPath v1.1.5 · macOS 12+ · Rust + Tauri v2 · 完全离线</span>
     <div class="foot-links">
-      <a href="#features">功能</a><a href="#install">安装</a><a href="#faq">FAQ</a><a href="#top">回到顶部 ↑</a>
+      <a href="#features">功能</a><a href="#install">安装</a><a href="#faq">FAQ</a><a href="http://192.168.0.200/lil/tools-folderpath">开源地址</a><a href="#top">回到顶部 ↑</a>
     </div>
   </div>
 </footer>
