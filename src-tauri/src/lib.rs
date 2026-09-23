@@ -1,7 +1,7 @@
 mod clipboard;
 mod finder;
 mod history;
-mod notify;
+pub mod notify;
 mod tray;
 
 use std::path::PathBuf;
@@ -47,28 +47,55 @@ pub fn fetch_and_copy(app: &AppHandle, mode: finder::Mode) {
 
 fn finish(app: &AppHandle, result: Result<Vec<PathBuf>, finder::FinderError>) {
     match result {
-        Ok(paths) => {
-            let text = paths
-                .iter()
-                .map(|p| p.display().to_string())
-                .collect::<Vec<_>>()
-                .join("\n");
-            match clipboard::write_text(&text) {
-                Ok(()) => {
-                    let title = if paths.len() == 1 {
-                        "已复制路径".to_string()
-                    } else {
-                        format!("已复制 {} 个路径", paths.len())
-                    };
-                    notify::info(&title, &text);
-                    history::push(app, &paths);
-                }
-                Err(e) => notify::error("写入剪贴板失败", &e),
-            }
-        }
+        Ok(paths) => match copy_and_notify(&paths, false) {
+            Ok(()) => history::push(app, &paths),
+            Err(e) => notify::error("写入剪贴板失败", &e),
+        },
         Err(e) => notify::error("获取失败", &e.to_string()),
     }
     app.state::<AppState>().busy.store(false, Ordering::SeqCst);
+}
+
+/// 写剪贴板并发通知反馈。快捷键、托盘菜单与工具栏 helper 共用这一份语义。
+/// `wait_notify` 为 true 时同步等通知发出——短命进程不等就会整条丢失。
+fn copy_and_notify(paths: &[PathBuf], wait_notify: bool) -> Result<(), String> {
+    let text = paths
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    clipboard::write_text(&text)?;
+    let title = if paths.len() == 1 {
+        "已复制路径".to_string()
+    } else {
+        format!("已复制 {} 个路径", paths.len())
+    };
+    if wait_notify {
+        notify::show_and_wait(&title, &text);
+    } else {
+        notify::info(&title, &text);
+    }
+    Ok(())
+}
+
+/// `CopyPath Toolbar.app` 的唯一动作：解析当前文件夹 → 复制 → 通知，随即退出。
+/// 不进最近历史（那是托盘应用的运行时状态），错误同时打 stderr 便于排查。
+pub fn toolbar_copy() -> i32 {
+    match finder::resolve(finder::Mode::FolderPath) {
+        Ok(paths) => match copy_and_notify(&paths, true) {
+            Ok(()) => 0,
+            Err(e) => {
+                notify::show_and_wait("写入剪贴板失败", &e);
+                eprintln!("{e}");
+                1
+            }
+        },
+        Err(e) => {
+            notify::show_and_wait("获取失败", &e.to_string());
+            eprintln!("{e}");
+            1
+        }
+    }
 }
 
 /// 供 `--probe` 子命令使用：不启界面，直接把解析结果打到 stdout，便于逐项验证。

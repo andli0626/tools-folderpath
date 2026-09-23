@@ -14,20 +14,32 @@ pub fn set_bundle(bundle_id: &str) {
     }
 }
 
+fn build(title: &str, body: &str) -> notify_rust::Notification {
+    let mut n = notify_rust::Notification::new();
+    n.appname("CopyPath").summary(title);
+    if !body.is_empty() {
+        n.body(body);
+    }
+    n
+}
+
 /// 通知走独立线程：后端一旦表现异常（本机上它就曾把主线程挂死），也不能拖住托盘和菜单。
 pub fn show(title: &str, body: &str) {
     let title = title.to_string();
     let body = body.to_string();
     std::thread::spawn(move || {
-        let mut n = notify_rust::Notification::new();
-        n.appname("CopyPath").summary(&title);
-        if !body.is_empty() {
-            n.body(&body);
-        }
-        if let Err(e) = n.show() {
+        if let Err(e) = build(&title, &body).show() {
             eprintln!("通知发送失败（不影响已复制的内容）：{e}");
         }
     });
+}
+
+/// 同 `show`，但阻塞到后端返回。短命的工具栏 helper 必须用它：
+/// 异步线程还没发出去进程就退出，通知会整条丢失。
+pub fn show_and_wait(title: &str, body: &str) {
+    if let Err(e) = build(title, body).show() {
+        eprintln!("通知发送失败（不影响已复制的内容）：{e}");
+    }
 }
 
 pub fn info(title: &str, body: &str) {

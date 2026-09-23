@@ -1,6 +1,6 @@
 #!/bin/bash
-# 打包 CopyPath.app 与 dmg 安装镜像：dmg 输出到 ~/Downloads，.app 装到 ~/Applications。
-# 只需本机使用，不做开发者签名与公证。
+# 打包 CopyPath.app、CopyPath Toolbar.app 与 dmg 安装镜像：dmg 输出到 ~/Downloads，
+# .app 装到 ~/Applications。只需本机使用，不做开发者签名与公证。
 #
 # 三条硬约束：
 #   1) 项目在 /Volumes/SanDis1TB 外置盘上，target 默认放内部盘（可用环境变量覆盖）。
@@ -15,6 +15,9 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="CopyPath"
 EXE_NAME="copypath"
 BUNDLE_ID="com.lilin.folderpath"
+TB_APP_NAME="CopyPath Toolbar"
+TB_EXE_NAME="copypath-toolbar"
+TB_BUNDLE_ID="com.lilin.folderpath.toolbar"
 
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/Users/lilin/cargo-target/tools-folderpath}"
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-4}"
@@ -66,7 +69,7 @@ build_with_repair() {
     return 1
 }
 
-build_with_repair cargo build --release --bin "$EXE_NAME"
+build_with_repair cargo build --release --bin "$EXE_NAME" --bin "$TB_EXE_NAME"
 
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' tauri.conf.json | head -1)"
 [ -n "$VERSION" ] || { echo "读不到 tauri.conf.json 里的 version" >&2; exit 1; }
@@ -97,12 +100,37 @@ codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
     || { echo "CFBundleExecutable 不是 $EXE_NAME" >&2; exit 1; }
 codesign --verify --strict --verbose=2 "$APP_BUNDLE"
 
-# dmg：卷里只放 .app 和一个指向 /Applications 的软链接，拖一下就算装好。
+# 工具栏 helper（CopyPath Toolbar.app）：被点击时复制当前文件夹路径后立即退出。
+# 与主程序是两个 bundle id、互不依赖；首次点击会弹一次访达自动化授权。
+TB_APP_BUNDLE="$CARGO_TARGET_DIR/release/$TB_APP_NAME.app"
+rm -rf "$TB_APP_BUNDLE"
+mkdir -p "$TB_APP_BUNDLE/Contents/MacOS" "$TB_APP_BUNDLE/Contents/Resources"
+
+cp "$CARGO_TARGET_DIR/release/$TB_EXE_NAME" "$TB_APP_BUNDLE/Contents/MacOS/$TB_EXE_NAME"
+cp icons/icon.icns "$TB_APP_BUNDLE/Contents/Resources/icon.icns"
+printf 'APPL????' > "$TB_APP_BUNDLE/Contents/PkgInfo"
+
+plutil -convert binary1 Info.toolbar.plist -o "$TB_APP_BUNDLE/Contents/Info.plist"
+plutil -insert CFBundleShortVersionString -string "$VERSION" "$TB_APP_BUNDLE/Contents/Info.plist"
+plutil -insert CFBundleVersion -string "$VERSION" "$TB_APP_BUNDLE/Contents/Info.plist"
+
+codesign --force --deep --sign - --identifier "$TB_BUNDLE_ID" "$TB_APP_BUNDLE"
+
+[ "$(plutil -extract LSUIElement raw "$TB_APP_BUNDLE/Contents/Info.plist")" = "true" ] \
+    || { echo "Toolbar: LSUIElement 不为 true" >&2; exit 1; }
+[ "$(plutil -extract CFBundleIdentifier raw "$TB_APP_BUNDLE/Contents/Info.plist")" = "$TB_BUNDLE_ID" ] \
+    || { echo "Toolbar: bundle id 不是 $TB_BUNDLE_ID" >&2; exit 1; }
+[ "$(plutil -extract CFBundleExecutable raw "$TB_APP_BUNDLE/Contents/Info.plist")" = "$TB_EXE_NAME" ] \
+    || { echo "Toolbar: CFBundleExecutable 不是 $TB_EXE_NAME" >&2; exit 1; }
+codesign --verify --strict --verbose=2 "$TB_APP_BUNDLE"
+
+# dmg：卷里放两个 .app 和一个指向 /Applications 的软链接，拖一下就算装好。
 # 产物落在 ~/Downloads，不进仓库目录。
 DMG="$HOME/Downloads/${APP_NAME}_${VERSION}_universal.dmg"
 STAGE="$CARGO_TARGET_DIR/release/dmg-staging"
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -R "$APP_BUNDLE" "$STAGE/"
+cp -R "$TB_APP_BUNDLE" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 rm -f "$DMG"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGE" -ov -quiet -format UDZO "$DMG"
@@ -112,7 +140,7 @@ echo "安装包：$DMG"
 # 旧实例还占着单实例锁和托盘，先停掉再换。
 pkill -x "$EXE_NAME" 2>/dev/null || true
 sleep 1
-rm -rf "$INSTALL_DIR/$APP_NAME.app" "$INSTALL_DIR/FolderPath.app"
-cp -R "$APP_BUNDLE" "$INSTALL_DIR/"
-echo "已安装：$INSTALL_DIR/$APP_NAME.app（v$VERSION）"
+rm -rf "$INSTALL_DIR/$APP_NAME.app" "$INSTALL_DIR/FolderPath.app" "$INSTALL_DIR/$TB_APP_NAME.app"
+cp -R "$APP_BUNDLE" "$TB_APP_BUNDLE" "$INSTALL_DIR/"
+echo "已安装：$INSTALL_DIR/$APP_NAME.app + $TB_APP_NAME.app（v$VERSION）"
 open "$INSTALL_DIR/$APP_NAME.app"

@@ -1,12 +1,21 @@
 [package]
 name = "copypath"
-version = "1.0.0"
+version = "1.1.5"
 description = "CopyPath - 一键获取访达所选文件夹的绝对路径"
 edition = "2021"
 
 [lib]
 name = "copypath_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# 显式声明后 src/main.rs 的自动发现会关闭，两个 bin 都要写全。
+[[bin]]
+name = "copypath"
+path = "src/main.rs"
+
+[[bin]]
+name = "copypath-toolbar"
+path = "src/toolbar_main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

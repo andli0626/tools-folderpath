@@ -6,12 +6,16 @@ macOS 菜单栏小工具：把访达当前窗口或所选项目的绝对路径�
 /Volumes/SanDis1TB/WK-Tools/tools-folderpath
 ```
 
-Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osascript` 读访达。当前版本 1.0.0。
+Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osascript` 读访达。当前版本 1.1.5。
+
+1.1.5 起附带 **CopyPath Toolbar.app**：拖进访达工具栏后，点一下即复制当前文件夹路径
+（语义与「立即获取文件夹路径」完全一致）。
 
 ## 安装
 
-本机打包直接产出到 **`~/Downloads/CopyPath_1.0.0_universal.dmg`**。双击挂载，把
-**CopyPath.app 拖到 Applications** 即可。
+本机打包直接产出到 **`~/Downloads/CopyPath_1.1.5_universal.dmg`**。双击挂载，把
+**CopyPath.app 拖到 Applications** 即可（想用工具栏按钮就把 **CopyPath Toolbar.app**
+也一并拖过去）。
 
 本机生成的 dmg 不带隔离属性（`com.apple.quarantine`），所以双击就能打开，不需要额外的
 Gatekeeper 步骤。只有当 dmg 经过浏览器下载或隔空投送转到别的机器时才可能被拦，那时用
@@ -36,6 +40,17 @@ Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 1
 | --- | --- |
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd> | 复制"所在文件夹"路径 |
 | 菜单栏图标（左键或右键） | 展开菜单 |
+| 访达工具栏按钮（CopyPath Toolbar） | 与快捷键相同，见下 |
+
+### 访达工具栏按钮
+
+1. 装好 `~/Applications/CopyPath Toolbar.app`（`build-app.sh` 自动完成）。
+2. 在访达里打开它所在的文件夹，选中它，按住 <kbd>⌘</kbd> 拖到访达工具栏。
+
+之后在任何访达窗口点该按钮：helper 启动 → 复制当前文件夹路径 → 立即退出，每次点击都是
+全新进程，与主程序是否运行无关。它不写「最近路径」历史（那是托盘应用的运行时状态）。
+详细安装步骤与常见问题见[安装指南](docs/核心功能/访达工具栏按钮-安装指南.md)，
+实现原理见[技术方案](docs/核心功能/访达工具栏按钮-实现技术方案.md)。
 
 菜单项：
 
@@ -44,7 +59,7 @@ Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 1
 - **最近路径** —— 最多 10 条，点一条即复制；底部"清空历史"
 - **开机自启**
 - **退出 CopyPath**
-- **版本 1.0.0** —— 只读，取自 `tauri.conf.json`，不写死在代码里
+- **版本 1.1.5** —— 只读，取自 `tauri.conf.json`，不写死在代码里
 
 ### 路径语义
 
@@ -62,9 +77,10 @@ Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 1
 
 ## 首次运行授权
 
-读访达需要自动化权限，第一次触发时系统会弹窗，允许即可：
+读访达需要自动化权限，第一次触发时系统会弹窗，允许即可。**CopyPath Toolbar 是独立的
+bundle id，需要单独授权一次**（首次点工具栏按钮时弹窗）：
 
-**系统设置 → 隐私与安全性 → 自动化 → CopyPath → 打开「访达」**
+**系统设置 → 隐私与安全性 → 自动化 → CopyPath / CopyPath Toolbar → 打开「访达」**
 
 ## 数据位置
 
@@ -101,6 +117,7 @@ ad-hoc 重签名会改变 cdhash，旧的自动化授权随之失效。重置后
 
 ```bash
 tccutil reset AppleEvents com.lilin.folderpath
+tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独立 bundle id
 ```
 
 **「没有打开的访达窗口」**
@@ -128,6 +145,8 @@ tccutil reset AppleEvents com.lilin.folderpath
 - **左键不直接取路径。** 挂了菜单的 `NSStatusItem` 会在 `mouseDown` 里自己把菜单弹出来，
   tray-icon 铺在图标上的事件覆盖层因此收不到左键（实测右键收得到）。也就是
   "左键一键复制"和"右键出菜单"在同一个图标上不可兼得，一键交给了全局快捷键。
+- 工具栏按钮只覆盖「立即获取文件夹路径」一种语义，没有「复制选中项自身路径」入口，
+  也不写最近路径历史。
 - 选中 `.framework`、`.bundle` 这类包目录时，访达报的类别是 `folder`，会复制包自身路径。
 - 文件名里含换行的条目会被丢弃并在 stderr 告警，而不是拼进上一条路径。
 - 全局快捷键是编译期常量，没有设置界面。
