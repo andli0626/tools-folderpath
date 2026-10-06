@@ -7,7 +7,7 @@
 #   2) 装到 ~/Applications 而不是留在外置盘：开机自启的 LaunchAgent 会把 .app 的
 #      绝对路径写死，开机时盘没挂载自启就静默失效了。
 #   3) 不用 `cargo tauri build`：它要多编一遍 tauri_macros，而本机 ld 在这个 crate 上
-#      稳定链出坏 dylib。本项目无前端、无窗口，bundler 干的活（合并 Info.plist、
+#      稳定链出坏 dylib。本项目无 Web 前端，bundler 干的活（合并 Info.plist、
 #      塞 .icns）几条 cp/plutil 就能等价完成，dmg 直接交给 hdiutil。
 set -euo pipefail
 
@@ -142,5 +142,7 @@ pkill -x "$EXE_NAME" 2>/dev/null || true
 sleep 1
 rm -rf "$INSTALL_DIR/$APP_NAME.app" "$INSTALL_DIR/FolderPath.app" "$INSTALL_DIR/$TB_APP_NAME.app"
 cp -R "$APP_BUNDLE" "$TB_APP_BUNDLE" "$INSTALL_DIR/"
-echo "已安装：$INSTALL_DIR/$APP_NAME.app + $TB_APP_NAME.app（v$VERSION）"
+# ${VERSION} 必须加大括号：紧跟全角括号时，部分 locale 下 bash 会把 `）` 的
+# 首字节吞进变量名，报 "$VERSION：unbound variable"（v1.2.0 打包时实测踩中）。
+echo "已安装：$INSTALL_DIR/$APP_NAME.app + $TB_APP_NAME.app（v${VERSION}）"
 open "$INSTALL_DIR/$APP_NAME.app"

@@ -1,6 +1,6 @@
 [package]
 name = "copypath"
-version = "1.1.5"
+version = "1.2.1"
 description = "CopyPath - 一键获取访达所选文件夹的绝对路径"
 edition = "2021"
 
@@ -34,3 +34,24 @@ fs2 = "0.4"
 # 版本必须落在 notify-rust 4.18 同一 caret 区间里，否则会各编一份、Once 互不相干。
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6.15"
+
+# 悬浮按钮的 NSPanel：tao/wry/muda 内部就是 objc2 0.6 + objc2-app-kit 0.3，
+# 这三个版本号必须锁在同一区间，否则 objc 运行时会各挂一套类表。
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = [
+    "NSPanel",
+    "NSWindow",
+    "NSResponder",
+    "NSView",
+    "NSEvent",
+    "NSColor",
+    "NSScreen",
+    "NSImage",
+    "NSImageView",
+    "NSTextField",
+    "NSFont",
+    "NSMenu",
+    "NSMenuItem",
+    "NSBezierPath",
+] }

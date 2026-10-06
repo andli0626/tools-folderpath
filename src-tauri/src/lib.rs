@@ -1,5 +1,7 @@
 mod clipboard;
 mod finder;
+#[cfg(target_os = "macos")]
+mod float_button;
 mod history;
 pub mod notify;
 mod tray;
@@ -23,6 +25,10 @@ pub struct AppState {
     history: Mutex<Vec<PathBuf>>,
     history_menu: Mutex<Option<Submenu<Wry>>>,
     autostart_item: Mutex<Option<CheckMenuItem<Wry>>>,
+    #[cfg(target_os = "macos")]
+    float_item: Mutex<Option<CheckMenuItem<Wry>>>,
+    #[cfg(target_os = "macos")]
+    float_settings: Mutex<float_button::Settings>,
     config_dir: PathBuf,
 }
 
@@ -148,15 +154,25 @@ pub fn run() {
             let config_dir = handle.path().app_config_dir()?;
             #[cfg(target_os = "macos")]
             notify::set_bundle(&handle.config().identifier.clone());
+            #[cfg(target_os = "macos")]
+            let float_settings = float_button::load(&config_dir);
             handle.manage(AppState {
                 busy: AtomicBool::new(false),
                 history: Mutex::new(history::load(&config_dir)),
                 history_menu: Mutex::new(None),
                 autostart_item: Mutex::new(None),
+                #[cfg(target_os = "macos")]
+                float_item: Mutex::new(None),
+                #[cfg(target_os = "macos")]
+                float_settings: Mutex::new(float_settings),
                 config_dir,
             });
 
             tray::setup(handle)?;
+
+            // 悬浮面板在托盘建好后再显示，保证菜单勾选状态与实际一致。
+            #[cfg(target_os = "macos")]
+            float_button::init(handle);
 
             // 注册失败（被别的应用占用）只降级，托盘两条入口仍然可用。
             if let Err(e) = handle.global_shortcut().register(SHORTCUT) {
