@@ -195,14 +195,14 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
         <div>
           <span class="chip">macOS · 免费 · Rust + Tauri · 无广告</span>
           <h1>访达里的路径，<br><em>一键到剪贴板</em></h1>
-          <p class="lead">CopyPath 是一枚安静的菜单栏小工具：按一个快捷键、点一下托盘、或在访达工具栏点一下按钮，当前文件夹的绝对路径就进了剪贴板——终端、表单、文档随按随贴。</p>
+          <p class="lead">CopyPath 是一枚安静的菜单栏小工具：按一个快捷键、点一下托盘、点一下屏幕悬浮按钮，或在访达工具栏点一下按钮，当前文件夹的绝对路径就进了剪贴板——终端、表单、文档随按随贴。</p>
           <div class="hero-cta">
             <a class="btn btn-primary" href="#install">3 分钟装好 →</a>
             <a class="btn btn-ghost" href="#features">看看它都能干什么</a>
           </div>
           <div class="hero-meta">
-            <span><b>1.1.5</b> 当前版本</span>
-            <span><b>~3.9 MB</b> 安装包</span>
+            <span><b>1.2.1</b> 当前版本</span>
+            <span><b>~4.1 MB</b> 安装包</span>
             <span><b>0</b> 网络请求</span>
           </div>
           <div class="repo-line">开源地址：<a href="http://192.168.0.200/lil/tools-folderpath">http://192.168.0.200/lil/tools-folderpath</a></div>
@@ -235,15 +235,15 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
     </section>
   </div>
 
-  <!-- 三种触发 -->
+  <!-- 四种触发 -->
   <div class="wrap">
     <section id="features">
       <div class="sec-head">
         <span class="chip">核心功能</span>
-        <h2 class="h2">三种触发，总有一种顺手</h2>
-        <p class="lead">同一个动作——把"当前文件夹路径"送进剪贴板——三个入口，覆盖你不同的肌肉记忆。</p>
+        <h2 class="h2">四种触发，总有一种顺手</h2>
+        <p class="lead">同一个动作——把"当前文件夹路径"送进剪贴板——四个入口，覆盖你不同的肌肉记忆。</p>
       </div>
-      <div class="grid g3">
+      <div class="grid g2">
         <div class="card trig">
           <span class="num">⌃⌥⌘P</span>
           <h3>全局快捷键</h3>
@@ -259,6 +259,11 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
           <h3>访达工具栏按钮</h3>
           <p>把 CopyPath Toolbar 拖进访达工具栏，在任意文件夹点一下按钮即复制。不依赖主程序运行，即点即用即走。</p>
         </div>
+        <div class="card trig">
+          <span class="num">◉</span><span class="new">v1.2.0 新增</span>
+          <h3>屏幕悬浮按钮</h3>
+          <p>常驻屏幕的小胶囊：点一下复制「选中项自身路径」，按住拖到顺手的位置；右侧 × 一键关闭，右键切换语义。点击不抢 Finder 焦点。</p>
+        </div>
       </div>
     </section>
 
@@ -267,11 +272,11 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
       <div class="sec-head">
         <span class="chip">路径语义</span>
         <h2 class="h2">复制的永远是"你以为的那个路径"</h2>
-        <p class="lead">选中项优先、无选中回退窗口目录；同目录多个文件自动去重成一行。规则可预期，从不猜。</p>
+        <p class="lead">选中项优先、无选中回退窗口目录；同目录多个文件自动去重成一行。屏幕悬浮按钮左键固定执行右列语义，右键可临时切换两种语义。规则可预期，从不猜。</p>
       </div>
       <div class="tbl-scroll">
         <table class="tbl">
-          <thead><tr><th>访达里的状态</th><th>「立即获取文件夹路径」/ 快捷键 / 工具栏按钮</th><th>「复制选中项自身路径」</th></tr></thead>
+          <thead><tr><th>访达里的状态</th><th>「立即获取文件夹路径」/ 快捷键 / 工具栏按钮 / 悬浮按钮右键</th><th>「复制选中项自身路径」/ 悬浮按钮左键</th></tr></thead>
           <tbody>
             <tr><td>无选中项</td><td>当前窗口目录 <code>/Users/dev/Projects/app</code></td><td>当前窗口目录</td></tr>
             <tr><td>选中 1 个文件夹</td><td>该文件夹自身 <code>…/app/src</code></td><td>该文件夹自身</td></tr>
@@ -294,7 +299,7 @@ footer{border-top:1px solid var(--line);padding:var(--sp-5) 0 var(--sp-4);color:
         <div class="step">
           <div>
             <h3>获取应用</h3>
-            <p>双击挂载 <code style="font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px">CopyPath_1.1.5_universal.dmg</code>，把卷里的 <b>CopyPath.app</b>（想要工具栏按钮就把 <b>CopyPath Toolbar.app</b> 也带上）拖进 <b>应用程序</b> 文件夹。</p>
+            <p>双击挂载 <code style="font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px">CopyPath_1.2.1_universal.dmg</code>，把卷里的 <b>CopyPath.app</b>（想要工具栏按钮就把 <b>CopyPath Toolbar.app</b> 也带上）拖进 <b>应用程序</b> 文件夹。</p>
             <div class="code"><button class="copy-btn" type="button">复制</button><pre># 或者：从源码打包（自动产出 .app 与 .dmg 并安装启动）
 # 开源仓库：http://192.168.0.200/lil/tools-folderpath
 git clone http://192.168.0.200/lil/tools-folderpath
@@ -304,7 +309,7 @@ cd tools-folderpath && ./build-app.sh</pre></div>
         <div class="step">
           <div>
             <h3>首次运行</h3>
-            <p>打开 CopyPath.app，菜单栏出现图标即成功。第一次触发复制时系统会请求「控制访达」的自动化权限，点<b>允许</b>即可（仅一次）。</p>
+            <p>打开 CopyPath.app，菜单栏出现图标即成功，屏幕右缘同时出现悬浮小按钮（不想用就点胶囊右侧的 × ，或托盘菜单里的「悬浮按钮」开关）。第一次触发复制时系统会请求「控制访达」的自动化权限，点<b>允许</b>即可（仅一次）。</p>
           </div>
         </div>
         <div class="step">
@@ -364,6 +369,10 @@ cd tools-folderpath && ./build-app.sh</pre></div>
         <summary>工具栏按钮和快捷键行为一样吗？</summary>
         <div>路径语义完全一致（含多选去重）。两点差异：工具栏按钮不写「最近路径」历史，也没有「复制选中项自身路径」入口——那两项走托盘菜单。</div>
       </details>
+      <details>
+        <summary>屏幕上的悬浮小按钮是什么？怎么关掉？</summary>
+        <div>v1.2.0 新增：左键点击即复制「选中项自身路径」，按住可拖动位置，右键弹出菜单切换两种语义。关闭方式任选：<b>点胶囊右侧的 ×</b>（v1.2.1 起）、右键菜单「隐藏悬浮按钮」、或托盘菜单的「悬浮按钮」开关。开关与位置都会被记住（<code>~/Library/Application Support/com.lilin.folderpath/float-button.json</code>），托盘里随时再打开。点击它不会抢走访达的前置焦点。</div>
+      </details>
     </section>
   </div>
 
@@ -371,7 +380,7 @@ cd tools-folderpath && ./build-app.sh</pre></div>
   <div class="wrap">
     <div class="cta-band">
       <h2 class="h2">让路径复制只剩一下点击</h2>
-      <p>免费、离线、3.9 MB。装好后你会忘了它的存在——直到每次需要路径的时候。</p>
+      <p>免费、离线、4.1 MB。装好后你会忘了它的存在——直到每次需要路径的时候。</p>
       <a class="btn" href="#install">获取 CopyPath</a>
     </div>
   </div>
@@ -379,7 +388,7 @@ cd tools-folderpath && ./build-app.sh</pre></div>
 
 <footer>
   <div class="wrap foot-grid">
-    <span>CopyPath v1.1.5 · macOS 12+ · Rust + Tauri v2 · 完全离线</span>
+    <span>CopyPath v1.2.1 · macOS 12+ · Rust + Tauri v2 · 完全离线</span>
     <div class="foot-links">
       <a href="#features">功能</a><a href="#install">安装</a><a href="#faq">FAQ</a><a href="http://192.168.0.200/lil/tools-folderpath">开源地址</a><a href="#top">回到顶部 ↑</a>
     </div>

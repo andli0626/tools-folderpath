@@ -6,7 +6,7 @@ macOS 菜单栏小工具：把访达当前窗口或所选项目的绝对路径�
 /Volumes/SanDis1TB/WK-Tools/tools-folderpath
 ```
 
-Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osascript` 读访达。当前版本 1.1.5。
+Rust + Tauri v2，无 Web 前端（悬浮按钮是原生 AppKit 面板），路径通过 `osascript` 读访达。当前版本 1.2.1。
 
 **开源地址**：<http://192.168.0.200/lil/tools-folderpath>
 
@@ -14,6 +14,7 @@ Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osa
 
 ## 功能一览
 
+- **屏幕悬浮按钮**：常驻可拖动的小胶囊，点一下即复制选中项自身路径，右键切换语义或隐藏
 - **全局快捷键** <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd>：复制「所在文件夹」路径，无需切换窗口
 - **菜单栏托盘**：左键或右键图标展开菜单，含两种复制语义
 - **访达工具栏按钮**（CopyPath Toolbar.app）：点一下即复制当前文件夹路径，语义与快捷键完全一致
@@ -23,11 +24,11 @@ Rust + Tauri v2，无前端界面（不创建任何窗口），路径通过 `osa
 - **失败不动剪贴板**：取不到路径时保留原内容并提示，不会把旧值覆盖成错答案
 
 1.1.5 起附带 **CopyPath Toolbar.app**：拖进访达工具栏后，点一下即复制当前文件夹路径
-（语义与「立即获取文件夹路径」完全一致）。
+（语义与「立即获取文件夹路径」完全一致）。1.2.0 起自带**屏幕悬浮按钮**（默认开启）。
 
 ## 安装
 
-本机打包直接产出到 **`~/Downloads/CopyPath_1.1.5_universal.dmg`**。双击挂载，把
+本机打包直接产出到 **`~/Downloads/CopyPath_1.2.1_universal.dmg`**。双击挂载，把
 **CopyPath.app 拖到 Applications** 即可（想用工具栏按钮就把 **CopyPath Toolbar.app**
 也一并拖过去）。
 
@@ -69,9 +70,26 @@ Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 1
 
 | 触发 | 行为 |
 | --- | --- |
+| 屏幕悬浮按钮（左键） | 复制选中项自身路径 |
+| 屏幕悬浮按钮（右键） | 两种语义切换 / 隐藏按钮 |
 | <kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>P</kbd> | 复制「所在文件夹」路径 |
 | 菜单栏图标（左键或右键） | 展开菜单 |
 | 访达工具栏按钮（CopyPath Toolbar） | 与快捷键相同，见下 |
+
+### 屏幕悬浮按钮
+
+1.2.0 起默认显示在主屏幕右缘居中。它是挂了 `NonactivatingPanel` 掩码的原生 NSPanel：
+**点击不激活 CopyPath，Finder 保持前置**，读到的选中项语义与托盘菜单完全一致，结果照常
+进「最近路径」历史并弹通知。
+
+- **左键**：复制选中项自身路径（与托盘「复制选中项自身路径」同一条代码路径）
+- **× 按钮**：胶囊右侧常驻关闭钮，点一下即隐藏（1.2.1 起提供，等同右键「隐藏悬浮按钮」）
+- **按住拖动**：移动位置，松手即记忆（外接屏拔掉后还原不出位置时，自动回到默认位置）
+- **右键**：小菜单——两种复制语义切换、「隐藏悬浮按钮」
+- **显隐开关**：托盘菜单「悬浮按钮」勾选项
+
+开关状态与位置存在 `float-button.json`（见「数据位置」）。按钮是常驻窗口而非一次性
+进程，与工具栏 helper（点完即退、不写历史）不同，悬浮按钮写历史、随主程序存亡。
 
 ### 访达工具栏按钮
 
@@ -88,9 +106,10 @@ Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 1
 - **立即获取文件夹路径** —— 与快捷键相同
 - **复制选中项自身路径** —— 选中什么复制什么，不做归一化
 - **最近路径** —— 最多 10 条，点一条即复制；底部「清空历史」
+- **悬浮按钮** —— 显隐开关（默认开）
 - **开机自启**
 - **退出 CopyPath**
-- **版本 1.1.5** —— 只读，取自 `tauri.conf.json`，不写死在代码里
+- **版本 1.2.1** —— 只读，取自 `tauri.conf.json`，不写死在代码里
 
 ### 路径语义
 
@@ -118,6 +137,7 @@ bundle id，需要单独授权一次**（首次点工具栏按钮时弹窗）：
 | 用途 | 路径 |
 | --- | --- |
 | 最近路径 | `~/Library/Application Support/com.lilin.folderpath/history.json` |
+| 悬浮按钮开关与位置 | 同目录 `float-button.json` |
 | 单实例锁 | 同目录 `instance.lock` |
 | 开机自启 | `~/Library/LaunchAgents/CopyPath.plist` |
 
@@ -140,6 +160,7 @@ src-tauri/
     ├── main.rs               # 托盘应用入口（bin: copypath）
     ├── toolbar_main.rs       # 工具栏 helper 入口（bin: copypath-toolbar）
     ├── lib.rs                # 共享：快捷键注册、复制+通知、两种模式分发
+    ├── float_button.rs       # 屏幕悬浮按钮：非激活 NSPanel、拖动记忆、右键菜单
     ├── finder.rs             # osascript 解析窗口/选中项，路径归一化与去重
     ├── clipboard.rs          # 剪贴板写入
     ├── notify.rs             # 原生通知（含阻塞版 show_and_wait，供一次性进程用）
@@ -193,6 +214,13 @@ tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独
 **托盘图标不见了 / 起了两个**
 `pgrep -x copypath` 看进程；重复启动会被单实例锁挡掉并打印提示。
 
+**悬浮按钮不见了 / 想关掉**
+托盘菜单 → 「悬浮按钮」勾选即可显隐。状态与位置存在
+`~/Library/Application Support/com.lilin.folderpath/float-button.json`，
+删掉该文件重启，回到默认（显示、右缘居中）。拖出屏幕后不会自动找回来：还原不出
+位置（如拔掉外接屏）时启动会回落默认位置，但运行中拖到屏幕外就还在屏幕外，用开关
+关掉再开即可复位。
+
 **构建报 `can't find crate for xxx_derive` / `mis-aligned LINKEDIT string pool`**
 本机 `ld` 偶发把 proc-macro dylib 写坏，且 cargo 会把坏文件当成新产物复用。
 `build-app.sh` 会自动删掉坏产物（含 `.fingerprint`）重链，最多 8 次。
@@ -206,7 +234,9 @@ tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独
 
 - **左键不直接取路径。** 挂了菜单的 `NSStatusItem` 会在 `mouseDown` 里自己把菜单弹出来，
   tray-icon 铺在图标上的事件覆盖层因此收不到左键（实测右键收得到）。也就是
-  「左键一键复制」和「右键出菜单」在同一个图标上不可兼得，一键交给了全局快捷键。
+  「左键一键复制」和「右键出菜单」在同一个图标上不可兼得，一键交给了全局快捷键与悬浮按钮。
+- 悬浮按钮是常驻窗口：占用一小块屏幕，需要整块屏幕时用托盘菜单或右键菜单隐藏。
+  它没有独立快捷键，显隐只有托盘开关一个入口。
 - 工具栏按钮只覆盖「立即获取文件夹路径」一种语义，没有「复制选中项自身路径」入口，
   也不写最近路径历史。
 - 工具栏按钮绑定拖入时的 `.app` 路径，重装/挪动后需重新拖入。
@@ -219,7 +249,8 @@ tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独
 - [访达工具栏按钮 · 安装指南](docs/核心功能/访达工具栏按钮-安装指南.md) —— 拖入、首次授权、验证方法、FAQ
 - [访达工具栏按钮 · 实现技术方案](docs/核心功能/访达工具栏按钮-实现技术方案.md) —— 架构、时序、关键技术点
 - [推广落地页](docs/推广/index.html) —— 单文件静态网页，用户视角的产品介绍
-- [发布记录](docs/发布/README.md) —— 各版本变更记录（v1.1.5、v1.0.0）
+- [推广文档撰写指南](docs/推广/推广文档撰写指南.md) —— 推广页怎么写：视角、结构、事实纪律与验证流程
+- [发布记录](docs/发布/README.md) —— 各版本变更记录（v1.2.0、v1.1.5、v1.0.0）
 - [docs/README.md](docs/README.md) —— 文档中心索引
 
 本 README 描述当前状态，历史交付记录不写在这里。

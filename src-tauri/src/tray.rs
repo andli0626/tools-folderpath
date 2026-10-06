@@ -22,6 +22,16 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let fetch_item = MenuItem::with_id(app, "fetch-item", "复制选中项自身路径", true, None::<&str>)?;
     let history_sub = Submenu::with_id(app, "history", "最近路径", true)?;
     let autostart = CheckMenuItem::with_id(app, "autostart", "开机自启", true, false, None::<&str>)?;
+    // 初始勾选来自落盘设置；面板此刻还没建，不能拿 is_visible() 当真值。
+    #[cfg(target_os = "macos")]
+    let float_btn = CheckMenuItem::with_id(
+        app,
+        "float-button",
+        "悬浮按钮",
+        true,
+        app.state::<AppState>().float_settings.lock().unwrap().enabled,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "退出 CopyPath", true, None::<&str>)?;
     // 版本号只读，禁用态；真源是 tauri.conf.json，别在这里写死。
     let version = MenuItem::with_id(
@@ -36,19 +46,33 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         let state = app.state::<AppState>();
         *state.history_menu.lock().unwrap() = Some(history_sub.clone());
         *state.autostart_item.lock().unwrap() = Some(autostart.clone());
+        // 赋值表达式语句上直接挂 #[cfg] 会按「表达式属性」解析（E0658），包一层块。
+        #[cfg(target_os = "macos")]
+        {
+            *state.float_item.lock().unwrap() = Some(float_btn.clone());
+        }
     }
     history::refresh_menu(app);
 
-    let menu = Menu::with_items(app, &[
+    // 菜单项列表用 Vec 拼：数组字面量元素上挂不了 #[cfg]（expression attributes 未稳定）。
+    let sep_after_actions = PredefinedMenuItem::separator(app)?;
+    let sep_before_toggles = PredefinedMenuItem::separator(app)?;
+    let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = vec![
         &fetch_folder,
         &fetch_item,
-        &PredefinedMenuItem::separator(app)?,
+        &sep_after_actions,
         &history_sub,
-        &PredefinedMenuItem::separator(app)?,
-        &autostart,
-        &quit,
-        &version,
-    ])?;
+        &sep_before_toggles,
+    ];
+    #[cfg(target_os = "macos")]
+    {
+        items.push(&float_btn);
+    }
+    // 逐个 push：数组字面量会把元素类型统一成第一项的具体类型，混装过不了推断。
+    items.push(&autostart);
+    items.push(&quit);
+    items.push(&version);
+    let menu = Menu::with_items(app, &items)?;
 
     if app.autolaunch().is_enabled().unwrap_or(false) {
         let _ = autostart.set_checked(true);
@@ -65,6 +89,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "fetch-folder" => crate::fetch_and_copy(app, Mode::FolderPath),
             "fetch-item" => crate::fetch_and_copy(app, Mode::ItemPath),
+            #[cfg(target_os = "macos")]
+            "float-button" => crate::float_button::toggle(app),
             "quit" => app.exit(0),
             "autostart" => toggle_autostart(app),
             "history:clear" => history::clear(app),
