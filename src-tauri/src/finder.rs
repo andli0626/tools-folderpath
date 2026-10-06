@@ -36,13 +36,18 @@ pub const SCRIPT: &str = r#"tell application "Finder"
     return resText
 end tell"#;
 
-/// 两个托盘入口对应两种语义。
+/// 三个复制入口对应三种语义。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     /// 选中文件夹取自身，选中文件取其所在目录，无选中项取前置窗口目录。
     FolderPath,
     /// 一律取选中项自身路径。
     ItemPath,
+    /// 只取文件本身：选中里没有文件时回退到前置窗口目录。
+    ///
+    /// 不复用 `ItemPath`——那个模式选中文件夹时返回的就是文件夹路径，拿它当
+    /// 「复制文件路径」会让按钮标签在说谎。
+    FilePath,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +119,25 @@ pub fn parse(stdout: &str, mode: Mode) -> Result<Vec<PathBuf>, FinderError> {
                 // 同目录下的多个文件归一到一条，保持首次出现顺序。
                 if !out.contains(&p) {
                     out.push(p);
+                }
+            }
+        }
+        Mode::FilePath => {
+            // 只要文件。W 记录代表「无选中项回退窗口目录」，本身就该算作结果。
+            for r in &records {
+                if r.kind == 'F' || r.kind == 'W' {
+                    out.push(strip_trailing_slash(&r.item_path));
+                }
+            }
+            // 选中的全是文件夹（或一个都没选、但脚本没给 W 记录）时，不该交白卷：
+            // 回退到前置窗口目录，与 FolderPath 在「无选中项」时的行为对齐。
+            if out.is_empty() {
+                for r in &records {
+                    let raw = if r.kind == 'D' { &r.item_path } else { &r.container_path };
+                    let p = strip_trailing_slash(raw);
+                    if !out.contains(&p) {
+                        out.push(p);
+                    }
                 }
             }
         }
@@ -232,5 +256,43 @@ mod tests {
     #[test]
     fn empty_output_is_a_failure_not_an_empty_success() {
         assert!(matches!(parse("", Mode::FolderPath), Err(FinderError::Failed(_))));
+    }
+
+    // ---- Mode::FilePath：只取文件，选中全是文件夹时回退窗口目录 ----
+
+    #[test]
+    fn file_mode_keeps_files_and_drops_folders() {
+        let got = parse(FOLDER_AND_FILE, Mode::FilePath).unwrap();
+        assert_eq!(got, vec![PathBuf::from("/V/a.txt")]);
+    }
+
+    #[test]
+    fn file_mode_falls_back_to_window_when_only_folders_selected() {
+        // 选中 3 个文件夹、没有任何文件：不能交白卷，回退前置窗口目录。
+        let raw = "D\t/V/a/\t/V/\nD\t/V/b/\t/V/\nD\t/V/c/\t/V/\n";
+        let got = parse(raw, Mode::FilePath).unwrap();
+        assert_eq!(got, vec![PathBuf::from("/V")]);
+    }
+
+    #[test]
+    fn file_mode_on_window_fallback_record() {
+        // 无选中项时脚本给 W 记录，W 本身就是合法结果，不该被过滤掉。
+        let got = parse(WINDOW_ONLY, Mode::FilePath).unwrap();
+        assert_eq!(got, vec![PathBuf::from("/Users/lilin/Downloads")]);
+    }
+
+    #[test]
+    fn file_mode_returns_every_file_without_deduping() {
+        // 文件段不去重：三个文件就是三行，与 FolderPath 的归一化相反。
+        let got = parse(THREE_FILES, Mode::FilePath).unwrap();
+        assert_eq!(got.len(), 3);
+    }
+
+    #[test]
+    fn file_mode_never_returns_a_selected_folder_itself() {
+        // 「文件夹自身」只能出现在 D 记录里；这个模式必须一条都不给。
+        let raw = "D\t/V/src/\t/V/\n";
+        let got = parse(raw, Mode::FilePath).unwrap();
+        assert_eq!(got, vec![PathBuf::from("/V")], "应回退到容器，不应给出 /V/src");
     }
 }

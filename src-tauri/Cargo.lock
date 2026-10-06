@@ -398,6 +398,7 @@ name = "copypath"
 version = "1.2.1"
 dependencies = [
  "arboard",
+ "block2",
  "fs2",
  "mac-notification-sys",
  "notify-rust",

@@ -250,11 +250,7 @@ tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独
 - [访达工具栏按钮 · 实现技术方案](docs/核心功能/访达工具栏按钮-实现技术方案.md) —— 架构、时序、关键技术点
 - [推广落地页](docs/推广/index.html) —— 单文件静态网页，用户视角的产品介绍
 - [推广文档撰写指南](docs/推广/推广文档撰写指南.md) —— 推广页怎么写：视角、结构、事实纪律与验证流程
-<<<<<<< HEAD
-- [发布记录](docs/发布/README.md) —— 各版本变更记录（v1.1.5、v1.0.0）
-=======
-- [发布记录](docs/发布/README.md) —— 各版本变更记录（v1.2.0、v1.1.5、v1.0.0）
->>>>>>> dfa8a94b5ac4a92e6269b78053b19da75da7aa78
+- [发布记录](docs/发布/README.md) —— 各版本变更记录（v1.2.1、v1.2.0、v1.1.5、v1.0.0）
 - [docs/README.md](docs/README.md) —— 文档中心索引
 
 本 README 描述当前状态，历史交付记录不写在这里。

@@ -35,10 +35,24 @@ fs2 = "0.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6.15"
 
+# 按钮把闪一下的确认态复原掉。用 scheduledTimer 而非 dispatch：后者不在本项目
+# 依赖树里，为一个 0.7s 的复原动作引入新依赖不划算。block2 是 NSTimer block 签名的
+# 硬依赖，必须显式开。定时器不 retain（见 float_button.rs 的 FLASH 注释），所以
+# 面板先于定时器消失时只是复原不到，不会有悬垂访问。
+block2 = "0.6"
+
+# objc2 侧的 NSTimer / NSKeyValueCoding 只在默认 feature 里，objc2-foundation 这条
+# 保持默认 features 即可（已核实默认集含 NSObject / NSKeyValueCoding / NSTimer）。
+
 # 悬浮按钮的 NSPanel：tao/wry/muda 内部就是 objc2 0.6 + objc2-app-kit 0.3，
 # 这三个版本号必须锁在同一区间，否则 objc 运行时会各挂一套类表。
 objc2 = "0.6"
-objc2-foundation = "0.3"
+objc2-foundation = { version = "0.3", features = [
+    "NSObject",
+    "NSKeyValueCoding",
+    "NSTimer",
+    "NSValue",
+] }
 objc2-app-kit = { version = "0.3", features = [
     "NSPanel",
     "NSWindow",
@@ -54,4 +68,11 @@ objc2-app-kit = { version = "0.3", features = [
     "NSMenu",
     "NSMenuItem",
     "NSBezierPath",
+    # L1 容器：macOS 26+ 的原生 Liquid Glass（NSGlassEffectView）。按钮材质的
+    # 第一档，缺失会静默退化到 L2 且不报错，所以显式开并配走查项 W-55。
+    "NSGlassEffectView",
+    # L2 容器：macOS 10.14+ 的经典 vibrancy，给 12.0–25.9 的用户兜底。
+    "NSVisualEffectView",
+    # hover 高亮。触摸板也能触发，但只作装饰——功能全在常驻的两段上。
+    "NSTrackingArea",
 ] }

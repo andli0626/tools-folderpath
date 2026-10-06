@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CopyPath 悬浮按钮 · Liquid Glass 视觉稿 v1.3.0</title>
+<style>
+  :root{
+    --brand:hsl(217 98% 62%);--ink:hsl(220 18% 14%);--ink-2:hsl(220 10% 42%);
+    --ink-3:hsl(220 8% 58%);--bg:hsl(220 24% 98%);--surface:#fff;
+    --surface-2:hsl(220 26% 96%);--line:hsl(220 16% 91%);
+    --ok:hsl(145 55% 42%);--warn:hsl(35 88% 48%);--bad:hsl(2 70% 50%);
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Segoe UI","Microsoft YaHei",sans-serif;
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+       -webkit-font-smoothing:antialiased;line-height:1.65}
+  .wrap{max-width:1080px;margin:0 auto;padding:56px 28px 120px}
+  header h1{font-size:32px;letter-spacing:-.02em;margin:0 0 8px}
+  header p{margin:0;color:var(--ink-2);font-size:15px;max-width:64ch}
+  .badge{display:inline-block;background:linear-gradient(135deg,hsl(217 98% 62%),hsl(216 70% 48%));
+         color:#fff;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;
+         vertical-align:6px;margin-left:8px}
+  h2{font-size:20px;letter-spacing:-.01em;margin:64px 0 6px;padding-top:28px;border-top:1px solid var(--line)}
+  .lead{color:var(--ink-2);font-size:14px;margin:0 0 26px;max-width:72ch}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:22px;
+        padding:32px;box-shadow:0 1px 3px hsl(220 30% 20% / .06),0 4px 14px hsl(220 30% 20% / .05);
+        margin-bottom:22px}
+  .card h3{margin:0 0 4px;font-size:15px}
+  .card .sub{margin:0 0 24px;color:var(--ink-3);font-size:13px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:860px){.grid2{grid-template-columns:1fr}}
+
+  /* ── 舞台：按钮浮在任意内容之上 ───────────────── */
+  .stage{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--line);
+         height:220px;display:flex;align-items:center;justify-content:center}
+  .wp{position:absolute;inset:0}
+  .wp-light{background:linear-gradient(135deg,#f7f8fa,#e9ecf1 55%,#dfe3ea)}
+  .wp-dark{background:linear-gradient(135deg,#2b2f3e,#191c24 60%,#111319)}
+  .wp-photo{background:
+      radial-gradient(120% 90% at 18% 14%,#ffd08f 0%,transparent 55%),
+      radial-gradient(110% 85% at 82% 86%,#78aaff 0%,transparent 62%),
+      linear-gradient(135deg,#e9d3c0,#c6d4e9)}
+  .wp-doc{background:#fdfdfc}
+  .wp-doc::after{content:"";position:absolute;left:9%;top:14%;right:9%;bottom:14%;
+    background:repeating-linear-gradient(180deg,#dfe3e8 0 5px,transparent 5px 15px);opacity:.55}
+
+  /* ══ L1 · Liquid Glass（macOS 26+）══════════════════
+     真机由 NSGlassEffectView 渲染：背景折射位移 + 边缘高光 + 随交互形变。
+     浏览器用多层 backdrop-filter + 内阴影近似，仅表达设计意图。 */
+  .glass{position:relative;z-index:2;display:flex;align-items:stretch;height:36px;
+         border-radius:10px;isolation:isolate;
+         box-shadow:
+           inset 0 1px 0 hsl(0 0% 100% / .85),          /* 顶部高光 */
+           inset 0 -1px 0 hsl(0 0% 100% / .22),         /* 底部反光 */
+           inset 1px 0 0 hsl(0 0% 100% / .30),
+           inset -1px 0 0 hsl(0 0% 100% / .30),
+           0 1px 2px hsl(220 50% 10% / .10),
+           0 8px 24px hsl(220 50% 10% / .18);            /* 玻璃悬浮投影 */
+         backdrop-filter:blur(18px) saturate(200%) brightness(1.06);
+         -webkit-backdrop-filter:blur(18px) saturate(200%) brightness(1.06)}
+  .glass::before{ /* 折射环：玻璃边缘把背景内容向内压缩 */
+    content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:-1;
+    backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    box-shadow:inset 0 0 0 .5px hsl(0 0% 100% / .30)}
+  .glass.on-dark{
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / .34),
+      inset 0 -1px 0 hsl(0 0% 100% / .10),
+      inset 1px 0 0 hsl(0 0% 100% / .18),inset -1px 0 0 hsl(0 0% 100% / .18),
+      0 1px 2px hsl(0 0% 0% / .30),0 10px 30px hsl(0 0% 0% / .44);
+    backdrop-filter:blur(20px) saturate(190%) brightness(.92);
+    -webkit-backdrop-filter:blur(20px) saturate(190%) brightness(.92)}
+  .glass.on-dark::before{box-shadow:inset 0 0 0 .5px hsl(0 0% 100% / .16)}
+
+  /* 交互形变：effectIsInteractive = YES 的静态示意 */
+  .glass.press{transform:scale(.965);
+    box-shadow:inset 0 1px 0 hsl(0 0% 100% / .55),0 2px 10px hsl(220 50% 10% / .14)}
+  .glass.on-dark.press{box-shadow:inset 0 1px 0 hsl(0 0% 100% / .22),0 2px 10px hsl(0 0% 0% / .34)}
+  .glass.hov{box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / .90),inset 0 0 0 .5px hsl(0 0% 100% / .40),
+      0 1px 2px hsl(220 50% 10% / .10),0 10px 30px hsl(220 50% 10% / .22)}
+
+  .fp{display:flex;align-items:stretch;height:36px;border-radius:10px;overflow:hidden;
+      font-family:var(--font);user-select:none;-webkit-user-select:none;position:relative;z-index:2}
+  .fp .seg{display:flex;align-items:center;gap:4px;padding:0 10px 0 12px;font-size:12px;
+           white-space:nowrap;transition:background .14s var(--ease)}
+  .fp .seg .ic{width:14px;height:14px;flex:none;display:grid;place-items:center}
+  .fp .seg .ic svg{width:14px;height:14px;display:block}
+  .fp .div{width:.5px;margin:10px 0;flex:none}
+  .fp .close{width:18px;display:grid;place-items:center;flex:none;margin:0 2px 0 4px;border-radius:6px}
+  .fp .close svg{width:9px;height:9px}
+
+  .on-light .seg{color:hsl(220 22% 14%);font-weight:500}
+  .on-light .div{background:hsl(220 20% 20% / .14)}
+  .on-light .close{color:hsl(220 14% 40%)}
+  .on-dark .seg{color:hsl(0 0% 100% / .95);font-weight:500}
+  .on-dark .div{background:hsl(0 0% 100% / .20)}
+  .on-dark .close{color:hsl(0 0% 100% / .58)}
+
+  /* 成功 flash */
+  .fp .seg.flash{background:hsl(145 55% 42% / .26);border-radius:7px}
+
+  /* L2 · 经典 vibrancy */
+  .vib{backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%)}
+  .vib-light{background:hsl(220 20% 96% / .72);
+    box-shadow:inset 0 0 0 1px hsl(0 0% 100% / .55),0 6px 24px hsl(220 40% 10% / .16)}
+  .vib-dark{background:hsl(220 22% 16% / .62);
+    box-shadow:inset 0 0 0 1px hsl(0 0% 100% / .12),0 6px 24px hsl(220 40% 10% / .34)}
+  .vib .seg.hov{background:hsl(0 0% 100% / .10)}
+  .vib-light .seg.hov{background:hsl(220 30% 40% / .09)}
+  .vib .seg.down{background:hsl(0 0% 100% / .16)}
+
+  /* L3 · 深色实底 */
+  .l3{background:hsl(220 22% 16% / .92);
+      box-shadow:inset 0 0 0 1px hsl(0 0% 100% / .10),0 6px 20px hsl(220 40% 10% / .30)}
+  .l3 .seg{color:hsl(0 0% 100% / .95);font-weight:500}
+  .l3 .div{background:hsl(0 0% 100% / .16)}
+  .l3 .close{color:hsl(0 0% 100% / .55)}
+
+  /* 现状 1.2.1 */
+  .old{display:flex;align-items:center;gap:5px;height:34px;padding:0 14px;border-radius:17px;
+       background:hsl(0 0% 100% / .10);border:1px solid hsl(0 0% 100% / .22);color:#fff;
+       font-size:12.5px;white-space:nowrap;box-shadow:0 6px 24px hsl(220 40% 10% / .28);z-index:2}
+  .old .ic{width:15px;height:15px;display:grid;place-items:center}
+  .old .x{margin-left:5px;opacity:.55;font-size:13px;line-height:1}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-weight:600;color:var(--ink-2);font-size:12px;letter-spacing:.02em;
+     text-transform:uppercase;background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  code{font-family:var(--mono);font-size:12px;background:hsl(220 24% 95%);padding:1.5px 6px;
+       border-radius:5px;color:hsl(216 70% 38%)}
+  .callout{border-left:3px solid var(--warn);background:hsl(35 88% 48% / .07);
+           padding:14px 18px;border-radius:0 10px 10px 0;margin:20px 0;font-size:13.5px}
+  .callout.bad{border-color:var(--bad);background:hsl(2 70% 50% / .07)}
+  .callout.ok{border-color:var(--ok);background:hsl(145 55% 42% / .07)}
+  .callout.info{border-color:var(--brand);background:hsl(217 98% 62% / .07)}
+  .src{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:14px;
+       padding-top:12px;border-top:1px dashed var(--line)}
+  .chain{display:flex;align-items:stretch;gap:14px;flex-wrap:wrap}
+  .chain .step{flex:1;min-width:210px;border:1px solid var(--line);border-radius:14px;
+               padding:16px;background:var(--surface)}
+  .chain .lv{font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;
+             padding:2px 8px;border-radius:6px;display:inline-block;margin-bottom:9px}
+  .lv1{background:linear-gradient(135deg,hsl(217 98% 62%),hsl(216 70% 48%))}
+  .lv2{background:hsl(220 14% 52%)}.lv3{background:hsl(220 10% 62%)}
+  .chain .step h4{margin:0 0 4px;font-size:13.5px}
+  .chain .step p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.6}
+  .chain .step .sys{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:8px;
+                    display:block;border-top:1px dashed var(--line);padding-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>CopyPath 悬浮按钮 · Liquid Glass<span class="badge">v1.3.0 · 第二轮</span></h1>
+  <p>本轮按「符合 macOS 27 毛玻璃」重做容器层：目标从 <code>NSVisualEffectView</code>（10.14 的经典 vibrancy）换成 <code>NSGlassEffectView</code>——macOS 26 起 Apple 的原生 Liquid Glass，带背景折射、边缘高光与随交互形变。因为项目仍支持 macOS 12.0，必须三级降级。</p>
+</header>
+
+<!-- 三级链路 -->
+<h2>1 · 三级降级链路</h2>
+<p class="lead">这是本轮最关键的结构变更。<code>NSGlassEffectView</code> 是 <code>API_AVAILABLE(macos(26.0))</code>，而 <code>tauri.conf.json:25</code> 写死 <code>minimumSystemVersion: "12.0"</code>——直接换上去等于把 12.0–25.9 的用户全部打到崩溃。</p>
+
+<div class="chain">
+  <div class="step"><span class="lv lv1">L1 首选</span>
+    <h4>Liquid Glass</h4>
+    <p>折射背景 + 边缘高光 + hover/按下随形变。Apple 原生，观感随系统版本演进。</p>
+    <span class="sys">macOS 26+ · NSGlassEffectView(style .regular)</span></div>
+  <div class="step"><span class="lv lv2">L2 兜底</span>
+    <h4>经典 vibrancy</h4>
+    <p>模糊 + 半透明，无折射。比 L3 通透，但边缘没有高光，形变需手写。</p>
+    <span class="sys">macOS 10.14–25 · NSVisualEffectView + .hudWindow</span></div>
+  <div class="step"><span class="lv lv3">L3 保底</span>
+    <h4>深色实底</h4>
+    <p>放弃通透换可读性。刻意<b>不是</b>现状的白半透明——那个在浅底上只有 1.2:1。</p>
+    <span class="sys">macOS 12–13 · 手绘 hsl(220 22% 16% / .92)</span></div>
+</div>
+
+<div class="callout info">运行时判定用<b>类存在性</b>而非版本号比较：<code>AnyClass::get(c"NSGlassEffectView").is_some()</code>。这样对未来大版本也成立，不必维护版本白名单。</div>
+
+<!-- L1 四态 -->
+<h2>2 · L1 Liquid Glass · 四态</h2>
+<p class="lead">玻璃的自适应观感：浅底给近白通透玻璃，深底给暗色玻璃，两者都由系统决定。注意 hover/按下不是背景色块，而是<b>玻璃自身形变</b>（<code>effectIsInteractive = YES</code>）。</p>
+
+<div class="card">
+  <h3>浅色底（访达 / 白色文档）</h3>
+  <p class="sub">白底上玻璃几乎无色，靠顶部高光与投影划出边界——这是 Liquid Glass 的标志</p>
+  <div class="grid2">
+    <div class="stage wp wp-light">
+      <div class="fp glass on-light" style="width:163px">
+        <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+        <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+        <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;justify-content:center">
+      <div class="stage wp wp-light" style="height:96px">
+        <div class="fp glass hov on-light" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-3);margin:0">hover · 玻璃整体提亮 + 边缘高光加强，<b>无背景色块</b></p>
+      <div class="stage wp wp-light" style="height:96px">
+        <div class="fp glass press on-light" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-3);margin:0">按下 · 玻璃整体压缩 scale(0.965)，投影收紧</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>深色底 / 彩色内容</h3>
+  <p class="sub">彩色内容最能看出折射：玻璃里的背景色被压向边缘，中间被提亮</p>
+  <div class="grid2">
+    <div>
+      <div class="stage wp wp-dark" style="height:150px">
+        <div class="fp glass on-dark" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">深色底 · 玻璃变暗但通透，不是纯黑块</p>
+    </div>
+    <div>
+      <div class="stage wp wp-photo" style="height:150px">
+        <div class="fp glass on-dark" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-3);margin:12px 0 0">彩色底 · 折射最能被察觉的一档</p>
+    </div>
+  </div>
+  <div class="callout"><b>成功 flash 三档通用</b>：该段图标换 <code>checkmark</code>、底色 <code>hsl(145 55% 42% / .26)</code>、700ms 后复原。系统通知照旧照发——flash 解决「就地确认」，通知承担跨应用后的结果告知。</div>
+  <p class="src">对应技术方案 §3.1 / §3.4。浏览器用多层 <code>backdrop-filter</code> + 内阴影近似真机 Liquid Glass，<b>折射与形变的最终观感以真机 <code>NSGlassEffectView</code> 实渲染为准</b>，走查项 W-10 / W-47 专验。</p>
+</div>
+
+<!-- 现状 vs L1 -->
+<h2>3 · 现状 → L1 的观感跨越</h2>
+<div class="grid2">
+  <div class="card">
+    <h3>现状 v1.2.1</h3>
+    <p class="sub">手绘 <code>white @ .10</code> 填充，浅底上等于隐形</p>
+    <div class="stage wp wp-doc"><div class="old"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>复制路径<span class="x">×</span></div></div>
+    <div class="callout bad" style="margin-bottom:0"><b>对比度约 1.2:1。</b>这是已存在的缺陷，不是新需求带来的。</div>
+  </div>
+  <div class="card">
+    <h3>提案 v1.3.0 · L1</h3>
+    <p class="sub">Liquid Glass，在同一张白底上</p>
+    <div class="stage wp wp-doc"><div class="fp glass on-light" style="width:163px">
+      <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+      <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+      <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+    </div></div>
+    <div class="callout ok" style="margin-bottom:0"><b>白底上靠高光与投影划边界</b>，文字对比度由深色墨色保证。</div>
+  </div>
+</div>
+
+<!-- 三档并排 -->
+<h2>4 · 三档并排（同一彩色底）</h2>
+<p class="lead">降级不是「变丑」，是按可用能力取该档最好的观感。三档的圆角、字号、图标、分隔线完全一致，切换时只有材质变化。</p>
+<div class="card">
+  <div style="display:flex;flex-direction:column;gap:26px">
+    <div>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:0 0 9px"><b>L1</b> Liquid Glass · macOS 26+</p>
+      <div class="stage wp wp-photo" style="height:112px">
+        <div class="fp glass on-dark" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:0 0 9px"><b>L2</b> 经典 vibrancy · macOS 10.14–25</p>
+      <div class="stage wp wp-photo" style="height:112px">
+        <div class="fp vib vib-dark l3" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:0 0 9px"><b>L3</b> 深色实底 · macOS 12–13（刻意不是现状白半透明）</p>
+      <div class="stage wp wp-photo" style="height:112px">
+        <div class="fp l3" style="width:163px">
+          <div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l1.5 2H14a1 1 0 011 1v1H1V3a2 2 0 012-2zM1 6h14l-1 8.2a1 1 0 01-1 .8H3a1 1 0 01-1-.8L1 6z"/></svg></span>文件夹</div>
+          <div class="div"></div><div class="seg" style="flex:1"><span class="ic"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1h6L13 4.5V15H3.5A1.5 1.5 0 012 13.5v-11A1.5 1.5 0 013.5 1zM9 1.8V5h3.2L9 1.8z"/></svg></span>文件</div>
+          <div class="close"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="callout info" style="margin-bottom:0"><b>L3 为什么不沿用现状配色：</b>若降级路径照抄 1.2.1 的 <code>white @ .10</code>，那么 12.0–13.9 用户拿到的还是那个 1.2:1 的缺陷——只是换了个系统版本。深色实底白字约 <b>14:1</b>，牺牲通透换可读。</div>
+</div>
+
+<!-- 玻璃专项注意 -->
+<h2>5 · 玻璃专项：两处必须实测的坑</h2>
+<div class="grid2">
+  <div class="card">
+    <h3><code>effectIsInteractive</code> 走 KVC</h3>
+    <p class="sub">27.0 新增，当前 objc2 绑定里没有</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 14px">已核实 <code>objc2-app-kit</code> 0.3.2 的 <code>NSGlassEffectView.rs</code> 只有 <code>contentView</code>／<code>cornerRadius</code>／<code>tintColor</code>／<code>style</code>，<b>无 <code>effectIsInteractive</code></b>（该属性 27.0 才发布）。不升级依赖时用 KVC 直接设：</p>
+    <code style="display:block;padding:12px;border-radius:9px;white-space:pre;font-size:11.5px">glass.setValue(
+  &amp;NSNumber::from_bool(true),
+  forKey: c"effectIsInteractive")</code>
+    <div class="callout bad" style="margin-bottom:0;font-size:13px"><b>这是本方案最脆的一处。</b>KVC 对未声明 selector 在某些版本上会静默失败——不抛错，只是没效果。所以必须有肉眼可判的验收项（W-45~W-48），不能只看代码写没写；并让手写三态在 L1 下也生效作为兜底。</div>
+  </div>
+  <div class="card">
+    <h3>圆角交给玻璃，别手绘</h3>
+    <p class="sub">第一轮的设计错误</p>
+    <p style="font-size:13.5px;color:var(--ink-2);margin:0 0 14px">`NSGlassEffectView` 自带 <code>cornerRadius</code> 且会对内容做折射裁切。L1 下若仍让 <code>drawRect</code> 画圆角矩形，会出现「手绘圆角盖在玻璃圆角上」的错位——两者曲率算法不同，边缘高光会露出来。</p>
+    <table>
+      <thead><tr><th>级别</th><th>圆角来源</th></tr></thead>
+      <tbody>
+        <tr><td><b>L1</b></td><td><code>glass.cornerRadius = 10</code>，<b>禁手绘</b></td></tr>
+        <tr><td>L2/L3</td><td><code>drawRect</code> 手绘，<code>RADIUS = 10</code></td></tr>
+      </tbody>
+    </table>
+    <div class="callout info" style="margin-bottom:0;font-size:13px">三档统一 10pt，不回到现状的 <code>height/2</code> 全胶囊——宽度涨到 163pt 后全胶囊会变成「药丸」，与 macOS 原生控件不像。</div>
+  </div>
+</div>
+
+<!-- 尺寸 -->
+<h2>6 · 尺寸与命中区</h2>
+<div class="card">
+  <p class="lead" style="margin-top:0">宽度从 107pt 涨到 <b>162.5pt</b>。这会暴露一个现成漏洞：<code>frame_at()</code> 只判「与屏幕是否相交」，相交就认——之前把按钮拖到右缘的用户，升级后有一半出屏。夹紧是必做项。</p>
+  <table>
+    <thead><tr><th style="width:130px">区</th><th style="width:190px">x 范围（pt）</th><th>行为</th></tr></thead>
+    <tbody>
+      <tr><td><b>区 0</b> 文件夹</td><td><code>0 … 76.0</code></td><td><code>Mode::FolderPath</code>，可拖</td></tr>
+      <tr><td>分隔线</td><td><code>76.0 … 76.5</code></td><td>无（0.5pt 缝隙），可拖</td></tr>
+      <tr><td><b>区 1</b> 文件</td><td><code>76.5 … 138.5</code></td><td><code>Mode::FilePath</code>（新增），可拖</td></tr>
+      <tr><td><b>区 2</b> ×</td><td><code>142.5 … 160.5</code></td><td><code>hide_and_disable</code>，<b>禁拖</b>（1.2.1 已定）</td></tr>
+    </tbody>
+  </table>
+  <div class="callout" style="margin-bottom:0"><b>一个明确否决的方案：</b>把面板做大、玻璃画在中间留投影余量。面板一旦大于可见胶囊，多出的透明区域会<b>吃掉下面应用的点击</b>——现在 <code>hitTest()</code> 对任何点都返回自身、不做形状判定。所以面板<b>严格等于</b>可见胶囊，投影交给系统窗口阴影（macOS 对 borderless 窗口的系统阴影画在 frame 之外且不计入命中区）。</div>
+</div>
+
+</div>
+</body>
+</html>
