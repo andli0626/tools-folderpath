@@ -108,6 +108,7 @@ pub fn toolbar_copy() -> i32 {
 pub fn probe(arg: Option<&str>) -> i32 {
     let mode = match arg {
         Some("item") => finder::Mode::ItemPath,
+        Some("file") => finder::Mode::FilePath,
         _ => finder::Mode::FolderPath,
     };
     match finder::resolve(mode) {

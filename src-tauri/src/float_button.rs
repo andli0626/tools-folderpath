@@ -46,7 +46,7 @@ const SEG_PAD_R: f64 = 10.0;
 const DIVIDER_W: f64 = 0.5;
 /// 分隔线上下内缩量，故线高 = HEIGHT − 2 × DIVIDER_INSET = 16。
 const DIVIDER_INSET: f64 = 10.0;
-/// 圆角半径。**不是** HEIGHT/2 的全胶囊：宽度涨到 162.5 后全胶囊会变成一根
+/// 圆角半径。**不是** HEIGHT/2 的全胶囊：宽度涨到 163.0 后全胶囊会变成一根
 /// 「药丸」，与 macOS 原生分段控件不像。10 对齐 macOS 26+ 控件圆角量级。
 const RADIUS: f64 = 10.0;
 /// × 关闭区：间隙 + 点击区 + 右缘留白。整个右区都在关闭热区内。
@@ -65,7 +65,7 @@ const FLASH_SECS: f64 = 0.7;
 const LABEL_FOLDER_W: f64 = 36.0;
 const LABEL_FILE_W: f64 = 24.0;
 
-/// 按钮的三个命中区。分隔线那 0.5pt 归入左侧可拖区，不单独成区。
+/// 按钮的三个命中区。分隔线那 0.5pt 归入右段（`zone_at` 左闭右开）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Zone {
     /// 复制文件夹路径。
@@ -76,6 +76,19 @@ pub enum Zone {
     Close = 2,
     /// 拖动把手：按下后位移超阈值就移动窗口，松手不触发任何复制。
     Drag = 3,
+}
+
+impl Zone {
+    /// 从 `down_zone` 存储的 i8 还原。-1（未按下）返回 None。
+    fn from_i8(v: i8) -> Option<Zone> {
+        match v {
+            0 => Some(Zone::Folder),
+            1 => Some(Zone::File),
+            2 => Some(Zone::Close),
+            3 => Some(Zone::Drag),
+            _ => None,
+        }
+    }
 }
 
 /// 材质档位。L1/L2 由系统渲染材质，L3 是手绘兜底。
@@ -108,29 +121,20 @@ pub fn material_tier() -> Material {
 /// 投影交给系统窗口阴影，macOS 对 borderless 窗口的阴影画在 frame 之外且
 /// 不计入命中区。见技术方案 §3.3。
 pub fn capsule_width() -> f64 {
-    (PAD_L
-        + ICON
-        + GAP
-        + LABEL_FOLDER_W
-        + SEG_PAD_R
-        + DIVIDER_W
-        + SEG_PAD_R
-        + ICON
-        + GAP
-        + LABEL_FILE_W
-        + SEG_PAD_R
-        + CLOSE_GAP
-        + CLOSE_ZONE
-        + CLOSE_PAD_R)
-        .ceil()
+    zone_bounds()[4]
 }
 
-/// 各区的 x 边界（右开）。索引 0 为 0，索引 4 为总宽。
+/// 各区的 x 边界（左闭右开）。索引 0 为 0，索引 4 为总宽。
+///
+/// 总宽与分区**必须由同一份边界算出**，否则「画出来的宽」和「判定用的宽」
+/// 会各算各的——宽度公式与 zone_at 共用本函数，杜绝这种漂移。
 fn zone_bounds() -> [f64; 5] {
     let d0 = PAD_L + ICON + GAP + LABEL_FOLDER_W + SEG_PAD_R;
     let d1 = d0 + DIVIDER_W + SEG_PAD_R + ICON + GAP + LABEL_FILE_W + SEG_PAD_R;
     let d2 = d1 + CLOSE_GAP;
-    [0.0, d0, d1, d2, capsule_width()]
+    // 总宽由 d2 + × 区宽度 + 右缘留白推出，与上面的边界同源。
+    let d3 = (d2 + CLOSE_ZONE + CLOSE_PAD_R).ceil();
+    [0.0, d0, d1, d2, d3]
 }
 
 /// 纯函数：x 落在哪个区。宽度与分区共用同一套边界，「算出来的」与
@@ -316,7 +320,11 @@ fn create_panel(app: &AppHandle, mtm: MainThreadMarker) -> Retained<NSPanel> {
     panel.setHasShadow(true);
     panel.setAcceptsMouseMovedEvents(true);
 
-    let view = FloatButtonView::new_with_frame(app.clone(), frame, tier, mtm);
+    // 视图坐标以自身 bounds 为原点。用屏幕坐标的窗口 frame 初始化会让
+    // Vibrancy 档的 addSubview 把内容摆到材质视图之外（macOS 12–15 上
+    // 整个按钮只剩一块空材质）。
+    let view_frame = NSRect::new(NSPoint::new(0.0, 0.0), size);
+    let view = FloatButtonView::new_with_frame(app.clone(), view_frame, tier, mtm);
 
     // 两段文字：左「文件夹」右「文件」。位置与 zone_bounds 同源，保证文字
     // 落在各自命中区内。
@@ -339,11 +347,32 @@ fn create_panel(app: &AppHandle, mtm: MainThreadMarker) -> Retained<NSPanel> {
         view.addSubview(&label);
     }
 
-    // 材质容器：L1/L2 由系统视图渲染，L3 走 drawRect 手绘。
+    // 两段图标：常驻创建一次，确认态由 drawRect 换图换色。
+    {
+        let ivars = view.ivars();
+        for (slot, x0, base) in [
+            (&ivars.folder_icon, PAD_L, "folder"),
+            (&ivars.file_icon, b[1] + SEG_PAD_R, "doc"),
+        ] {
+            if let Some(img) = symbol_image(base) {
+                let iv = NSImageView::imageViewWithImage(&img, mtm);
+                iv.setFrameOrigin(NSPoint::new(x0, (HEIGHT - ICON) / 2.0));
+                iv.setContentTintColor(Some(&ink));
+                view.addSubview(&iv);
+                *slot.borrow_mut() = Some(iv);
+            }
+        }
+    }
+
+    // 材质容器：L1/L2 由系统视图渲染，L3 走 drawRect 手绘（视图自己就是容器）。
     let content: Retained<NSView> = match tier {
-        Material::Glass => install_glass(&view, frame),
-        Material::Vibrancy => install_vibrancy(&view, frame),
-        Material::Solid => view.as_super().clone(),
+        Material::Glass => install_glass(&view, view_frame),
+        Material::Vibrancy => install_vibrancy(&view, view_frame),
+        Material::Solid => {
+            // L3 没有材质容器，视图自己就是内容视图。
+            unsafe { Retained::retain(view.as_super() as *const NSView as *mut NSView) }
+                .expect("self 必须存活")
+        }
     };
 
     view.as_super().setToolTip(Some(ns_string!(
@@ -370,7 +399,7 @@ fn install_glass(view: &Retained<FloatButtonView>, frame: NSRect) -> Retained<NS
     }
     glass.setContentView(Some(view.as_super()));
     // 玻璃的直接父类是 NSResponder，contentView 要的是 NSView，故显式转一层。
-    let as_view: Retained<NSView> = unsafe { Retained::cast(glass.into_super()) };
+    let as_view: Retained<NSView> = unsafe { Retained::cast_unchecked(glass.into_super()) };
     as_view
 }
 
@@ -382,11 +411,18 @@ fn install_vibrancy(view: &Retained<FloatButtonView>, frame: NSRect) -> Retained
     fx.setMaterial(NSVisualEffectMaterial::HUDWindow);
     fx.setBlendingMode(NSVisualEffectBlendingMode::WithinWindow);
     fx.setState(NSVisualEffectState::Active);
-    fx.setWantsLayer(true);
-    fx.layer().setCornerRadius(RADIUS);
-    fx.layer().setMasksToBounds(true);
-    fx.setContentView(Some(view.as_super()));
-    let as_view: Retained<NSView> = unsafe { Retained::cast(fx.into_super()) };
+    // vibrancy 视图没有 contentView 槽位，走 addSubview。圆角靠 CALayer
+    // 自己做蒙版，否则材质会溢出成方形。CALayer 的圆角方法不在
+    // objc2-quartz-core 的生成绑定里（未随本项目展开），故走 msg_send。
+    if let Some(layer) = fx.layer() {
+        unsafe {
+            let l: &AnyObject = &*layer;
+            let _: () = msg_send![l, setCornerRadius: RADIUS];
+            let _: () = msg_send![l, setMasksToBounds: true];
+        }
+    }
+    fx.addSubview(view.as_super());
+    let as_view: Retained<NSView> = unsafe { Retained::cast_unchecked(fx.into_super()) };
     as_view
 }
 
@@ -400,7 +436,7 @@ fn visible_frames(mtm: MainThreadMarker) -> Vec<NSRect> {
 /// 把记住的左上角坐标还原成窗口 frame；不与任何屏幕相交则返回 None（回落默认位置，
 /// 覆盖外接屏被拔掉、分辨率变了等场景）。
 ///
-/// 命中某块屏幕后还要**夹紧**到它的可见区内：按钮从 107pt 加宽到 162.5pt 之后，
+/// 命中某块屏幕后还要**夹紧**到它的可见区内：按钮从 107pt 加宽到 163.0pt 之后，
 /// 之前停在屏幕右缘的用户若只按「相交」判定，会有一半按钮落在屏幕外
 /// （走查项 W-32）。`default_origin` 本来就会算边距，保存位置的还原路径原先漏了。
 fn frame_at(top_left: (f64, f64), size: NSSize, screens: &[NSRect]) -> Option<NSRect> {
@@ -408,14 +444,22 @@ fn frame_at(top_left: (f64, f64), size: NSSize, screens: &[NSRect]) -> Option<NS
         NSPoint::new(top_left.0, top_left.1 - size.height),
         size,
     );
-    let vf = screens.iter().copied().find(|s| intersects(raw, *s))?;
-    // 取左缘与右缘都留得住的位置：优先贴住记忆位置，越界才推。
+    // 夹紧优先：先按「左上角落在哪块屏」归属，再把窗口拉回可见区。
+    //
+    // 不能只按窗口是否相交来归属——按钮加宽后，停在屏幕右缘的旧位置会让
+    // 窗口**完全**跑到屏外（x=1440、宽 163），相交判定为 false，于是掉回
+    // 默认位置，用户看到的是「按钮莫名跑回右边」而不是「被拉回来」。
+    // 以左上角归属能让它稳定停在右缘，与用户拖放时的意图一致。
+    let vf = screens
+        .iter()
+        .copied()
+        .find(|s| raw.origin.x >= s.origin.x && raw.origin.x < s.origin.x + s.size.width)
+        .or_else(|| screens.iter().copied().find(|s| intersects(raw, *s)))?;
     let x = raw
         .origin
         .x
         .clamp(vf.origin.x, (vf.origin.x + vf.size.width - size.width).max(vf.origin.x));
-    // 底部同理。顶部方向越界就交给 max 兜底，min 侧因 visibleFrame 通常不从屏幕顶
-    // 开始，这里仍按同一逻辑夹一次，避免多屏不同缩放时出现负值。
+    // 底部同理：屏幕顶通常在菜单栏之下，越界才推。
     let y = raw
         .origin
         .y
@@ -452,9 +496,14 @@ struct ButtonIvars {
     tier: Cell<Material>,
     /// 拖动标记：mouseUp 据此区分「点击」与「拖完松手」。
     dragging: Cell<bool>,
-    /// mouseDown 命中的区：松手时按它分发到复制 / 关闭 / 忽略。
-    down_zone: Cell<Zone>,
-    /// 指针当前悬停的区，仅作高亮装饰。-1 表示不在任何复制段上。
+    /// mouseDown 命中的区（`Zone as i8`），松手时按它分发；-1 表示当前没按下。
+    /// 用 i8 而非 Zone 是为了能表达「无」——`pressed` 高亮判定依赖它复位。
+    down_zone: Cell<i8>,
+    /// 两段图标的常驻视图。drawRect 只换图与着色，**不得**再 addSubview，
+    /// 否则每次重绘都累积一对子视图。
+    folder_icon: RefCell<Option<Retained<NSImageView>>>,
+    file_icon: RefCell<Option<Retained<NSImageView>>>,
+    /// 指针当前悬停的区，仅作装饰。-1 表示不在任何复制段上。
     hover_zone: Cell<i8>,
     /// 复制成功确认态命中的区，-1 表示无。命中时该段显示 ✓ 并泛绿。
     flash_zone: Cell<i8>,
@@ -500,7 +549,7 @@ define_class!(
                 );
                 // 深色实底：白字约 14:1，任何壁纸上都达标。刻意不用 1.2.1 的
                 // white@0.10——那在浅底上只有 1.2:1（走查项 W-52）。
-                NSColor::colorWithCalibrationRed_green_blue_alpha(0.122, 0.125, 0.157, 0.92)
+                NSColor::colorWithSRGBRed_green_blue_alpha(0.122, 0.125, 0.157, 0.92)
                     .setFill();
                 path.fill();
                 NSColor::colorWithWhite_alpha(0.10, 1.0).setStroke();
@@ -520,7 +569,7 @@ define_class!(
 
             // hover / press 高亮。L1 的原生形变可能没生效（KVC 静默失败），
             // 所以手写这层始终画，作为兜底（走查项 W-46）。
-            let mut paint_seg = |x0: f64, x1: f64, flash: bool, hovered: bool, pressed: bool| {
+            let paint_seg = |x0: f64, x1: f64, flash: bool, hovered: bool, pressed: bool| {
                 if !flash && !hovered && !pressed {
                     return;
                 }
@@ -530,7 +579,7 @@ define_class!(
                 );
                 let p = NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(r, 7.0, 7.0);
                 if flash {
-                    NSColor::colorWithCalibrationRed_green_blue_alpha(0.11, 0.55, 0.33, 0.26)
+                    NSColor::colorWithSRGBRed_green_blue_alpha(0.11, 0.55, 0.33, 0.26)
                         .setFill();
                 } else if pressed {
                     NSColor::colorWithWhite_alpha(0.16, 1.0).setFill();
@@ -541,29 +590,35 @@ define_class!(
             };
             let flash = ivars.flash_zone.get();
             let hover = ivars.hover_zone.get();
-            let pressed = !ivars.dragging.get() && ivars.down_zone.get() as i8 != -1;
+            let down = ivars.down_zone.get();
+            let pressed = !ivars.dragging.get() && down != -1;
             paint_seg(
                 2.0,
                 b[1],
                 flash == Zone::Folder as i8,
                 hover == Zone::Folder as i8,
-                pressed && ivars.down_zone.get() == Zone::Folder,
+                pressed && down == Zone::Folder as i8,
             );
             paint_seg(
                 b[1] + DIVIDER_W,
                 b[2],
                 flash == Zone::File as i8,
                 hover == Zone::File as i8,
-                pressed && ivars.down_zone.get() == Zone::File,
+                pressed && down == Zone::File as i8,
             );
 
-            // 两段图标：成功确认态换成 ✓，其余显示各自的 SF Symbol。
-            for (zone, x0, name, alt) in [
-                (Zone::Folder, PAD_L, "folder", "folder.fill"),
-                (Zone::File, b[1] + SEG_PAD_R, "doc", "checkmark"),
+            // 两段图标：成功确认态一律换成 ✓，其余显示各自的 SF Symbol。
+            // 视图是创建时挂好的常驻子视图，这里只换图与着色——在 drawRect
+            // 里 addSubview 会让每次重绘都累积一对新视图。
+            for (zone, base, slot) in [
+                (Zone::Folder, "folder", &ivars.folder_icon),
+                (Zone::File, "doc", &ivars.file_icon),
             ] {
+                let Some(iv) = slot.borrow().clone() else {
+                    continue;
+                };
                 let is_flash = flash == zone as i8;
-                let symbol = if is_flash { alt } else { name };
+                let symbol = if is_flash { "checkmark" } else { base };
                 let ink = if is_flash {
                     NSColor::systemGreenColor()
                 } else if dark_ink {
@@ -571,16 +626,8 @@ define_class!(
                 } else {
                     NSColor::labelColor()
                 };
-                if let Some(img) = NSImage::imageWithSystemSymbolName_accessibilityDescription(
-                    ns_string!(symbol),
-                    None,
-                ) {
-                    img.setSize(NSSize::new(ICON, ICON));
-                    let iv = NSImageView::imageViewWithImage(&img, mtm());
-                    iv.setFrameOrigin(NSPoint::new(x0, (HEIGHT - ICON) / 2.0));
-                    iv.setContentTintColor(Some(&ink));
-                    self.as_super().addSubview(&iv);
-                }
+                iv.setImage(symbol_image(symbol).as_deref());
+                iv.setContentTintColor(Some(&ink));
             }
 
             // × 关闭钮：常驻胶囊右侧，点一下等同右键菜单的「隐藏悬浮按钮」。
@@ -615,7 +662,7 @@ define_class!(
         }
 
         #[unsafe(method(mouseExited:))]
-        unsafe fn mouse_exited(&self) {
+        unsafe fn mouse_exited(&self, _event: &NSEvent) {
             let ivars = self.ivars();
             if ivars.hover_zone.get() != -1 {
                 ivars.hover_zone.set(-1);
@@ -629,7 +676,7 @@ define_class!(
             ivars.dragging.set(false);
             let point = event.locationInWindow();
             ivars.start.set(point);
-            ivars.down_zone.set(zone_at(point.x));
+            ivars.down_zone.set(zone_at(point.x) as i8);
             if let Some(window) = self.as_super().window() {
                 ivars.base_origin.set(window.frame().origin);
             }
@@ -640,7 +687,7 @@ define_class!(
         unsafe fn mouse_dragged(&self, event: &NSEvent) {
             let ivars = self.ivars();
             // × 区禁拖动（1.2.1 已定的规则）：避免「想关按钮却拖动了窗口」。
-            if ivars.down_zone.get() == Zone::Close {
+            if ivars.down_zone.get() == Zone::Close as i8 {
                 return;
             }
             let start = ivars.start.get();
@@ -664,6 +711,9 @@ define_class!(
         #[unsafe(method(mouseUp:))]
         unsafe fn mouse_up(&self, _event: &NSEvent) {
             let ivars = self.ivars();
+            // 先复位再分发：不重置的话 `pressed` 判定永远为真，
+            // 点过的段会永久卡在按下高亮态。
+            let down = Zone::from_i8(ivars.down_zone.replace(-1));
             if ivars.dragging.get() {
                 ivars.dragging.set(false);
                 if let Some(window) = self.as_super().window() {
@@ -672,22 +722,22 @@ define_class!(
                 self.as_super().setNeedsDisplay(true);
                 return;
             }
-            match ivars.down_zone.get() {
-                Zone::Close => {
+            match down {
+                Some(Zone::Close) => {
                     // 与右键菜单「隐藏悬浮按钮」同一条落盘关闭路径。
                     hide_and_disable(&ivars.app);
                 }
-                Zone::Folder => {
+                Some(Zone::Folder) => {
                     // 与托盘「立即获取文件夹路径」同一条代码路径（含最近历史与重入保护）。
                     start_flash(self, Zone::Folder);
                     crate::fetch_and_copy(&ivars.app, Mode::FolderPath);
                 }
-                Zone::File => {
+                Some(Zone::File) => {
                     start_flash(self, Zone::File);
                     crate::fetch_and_copy(&ivars.app, Mode::FilePath);
                 }
                 // 两段之间的留白：按下是为了拖动，松手不在任何段上，什么都不做。
-                Zone::Drag => {}
+                Some(Zone::Drag) | None => {}
             }
             self.as_super().setNeedsDisplay(true);
         }
@@ -738,7 +788,9 @@ impl FloatButtonView {
             app,
             tier: Cell::new(tier),
             dragging: Cell::new(false),
-            down_zone: Cell::new(Zone::Drag),
+            down_zone: Cell::new(-1),
+            folder_icon: RefCell::new(None),
+            file_icon: RefCell::new(None),
             hover_zone: Cell::new(-1),
             flash_zone: Cell::new(-1),
             flash_until: Cell::new(0.0),
@@ -752,12 +804,20 @@ impl FloatButtonView {
         let opts = NSTrackingAreaOptions::MouseMoved
             | NSTrackingAreaOptions::ActiveInKeyWindow
             | NSTrackingAreaOptions::InVisibleRect;
-        let area = NSTrackingArea::initWithFrame_options_owner(
-            NSTrackingArea::alloc(mtm),
-            NSRect::new(NSPoint::new(0.0, 0.0), frame.size),
-            opts,
-            Some(view.as_super()),
-        );
+        // NSTrackingArea 只需 init：options/rect 都在 initWithRect 里给。
+        // 走 new() + initWithRect 需要 Allocated<Self>，这里直接用 unsafe 的
+        // initWithRect 形式最省事，且避免 alloc 的 trait bound 问题。
+        let area: Retained<NSTrackingArea> = unsafe {
+            let allocated: objc2::rc::Allocated<NSTrackingArea> =
+                msg_send![NSTrackingArea::class(), alloc];
+            NSTrackingArea::initWithRect_options_owner_userInfo(
+                allocated,
+                NSRect::new(NSPoint::new(0.0, 0.0), frame.size),
+                opts,
+                Some(view.as_super()),
+                None,
+            )
+        };
         view.as_super().addTrackingArea(&area);
         view
     }
@@ -793,61 +853,74 @@ impl FloatButtonView {
     }
 }
 
-/// 主线程标记的便捷取值。drawRect 之类被系统回调的方法里没有 mtm 参数，
-/// 而 AppKit 视图方法必然跑在主线程，这里直接 unwrap。
-fn mtm() -> MainThreadMarker {
-    MainThreadMarker::new().expect("AppKit 视图方法必然在主线程")
+/// 按名字取 14pt 的 SF Symbol 图。取不到（系统没有该符号）返回 None，
+/// 由调用处跳过着色更新。
+fn symbol_image(name: &str) -> Option<Retained<NSImage>> {
+    let img = NSImage::imageWithSystemSymbolName_accessibilityDescription(
+        &NSString::from_str(name),
+        None,
+    )?;
+    img.setSize(NSSize::new(ICON, ICON));
+    Some(img)
 }
 
 /// 让某一段进入复制成功的确认态，并在 FLASH_SECS 后复原。
 ///
-/// 拆成两步而不是靠定时器反复轮询：一次性 `repeats: false` 的定时器在
-/// 0.7s 后只做「复原」这一件事，中途不需要重绘（flash_until 存的是墙钟，
-/// 万一定时器被系统推迟了，首次触发时会立刻判超时并复原，不会拖长）。
+/// 生命周期：定时器 block 必须 `'static`，不能借用 `&view`。这里捕获一个
+/// **`Retained` 强引用**——面板与子视图本来就在 `PANEL` 这个 thread_local 里
+/// 活到进程结束（或直到 × 关闭时 `orderOut`，但对象仍在），所以捕获强引用
+/// 不构成环，也不会比面板活得久。定时器一次性触发后即失效，不会累积。
 ///
-/// 定时器不持有视图的强引用：block 里只按窗口可见性做防御性检查。
-/// NSTimer 挂上 run loop 后即由 run loop 持有，故不需要额外保活。
+/// 走查项 W-26（flash 后能再点）与 W-46 覆盖这条。
 fn start_flash(view: &FloatButtonView, zone: Zone) {
     let ivars = view.ivars();
     ivars.flash_zone.set(zone as i8);
     ivars.flash_until.set(now_secs() + FLASH_SECS);
     view.as_super().setNeedsDisplay(true);
 
+    // 持有一份强引用，让定时器与视图同生共死，避免 block 里出现悬垂借用。
+    let owned: Retained<FloatButtonView> = unsafe {
+        Retained::retain(view as *const FloatButtonView as *mut FloatButtonView)
+            .expect("self 必须存活")
+    };
+    let block = block2::RcBlock::new(move |_timer: core::ptr::NonNull<NSTimer>| {
+        if MainThreadMarker::new().is_none() {
+            return;
+        }
+        let ivars = owned.ivars();
+        // 若期间又点了另一段（flash_until 被推后），这次触发只重绘不清理。
+        if now_secs() >= ivars.flash_until.get() {
+            ivars.flash_zone.set(-1);
+            ivars.flash_until.set(0.0);
+        }
+        owned.as_super().setNeedsDisplay(true);
+    });
     unsafe {
-        let block = block2::RcBlock::new(move |_timer: core::ptr::NonNull<NSTimer>| {
-            // AppKit 定时器在主线程触发，但面板可能已被 × 隐藏。
-            if MainThreadMarker::new().is_none() {
-                return;
-            }
-            let ivars = view.ivars();
-            if now_secs() >= ivars.flash_until.get() {
-                ivars.flash_zone.set(-1);
-                ivars.flash_until.set(0.0);
-            }
-            view.as_super().setNeedsDisplay(true);
-        });
-        NSTimer::scheduledTimerWithTimeInterval_repeats_block(
-            FLASH_SECS,
-            false,
-            &block,
-        );
+        NSTimer::scheduledTimerWithTimeInterval_repeats_block(FLASH_SECS, false, &block);
     }
 }
 
 /// 墙钟秒数。用绝对时间而非帧计数：定时器被系统节流时确认态不会被拖长。
 fn now_secs() -> f64 {
-    let t = NSDate::timeIntervalSinceReferenceDate(NSDate::new());
-    t as f64
+    let now = NSDate::new();
+    now.timeIntervalSinceReferenceDate() as f64
 }
 
 #[cfg(test)]
 mod zone_tests {
     use super::*;
 
-    /// 宽度公式的回归基线（走查 W-44 口径：数值与视觉稿一致）。
+    /// 宽度公式的回归基线。与 zone_bounds 同源推出：
+/// 12+14+4+36+10 +0.5+10+14+4+24+10 +4+18+2 = 163。
     #[test]
     fn capsule_width_matches_the_design_spec() {
-        assert_eq!(capsule_width(), 162.5);
+        assert_eq!(capsule_width(), 163.0);
+    }
+
+    /// 总宽必须等于最后一条边界，否则「画的宽」与「判的宽」会漂移。
+    #[test]
+    fn capsule_width_equals_the_last_boundary() {
+        assert_eq!(capsule_width(), zone_bounds()[4]);
     }
 
     #[test]
@@ -859,13 +932,13 @@ mod zone_tests {
     #[test]
     fn zone_boundaries_are_exact() {
         let b = zone_bounds();
-        // 分隔线：0.5pt 归入左段，右段从分隔线之后开始。
         assert_eq!(zone_at(0.0), Zone::Folder);
         assert_eq!(zone_at(b[1] - 0.1), Zone::Folder);
-        assert_eq!(zone_at(b[1]), Zone::Folder, "分隔线左缘仍是文件夹段");
-        assert_eq!(zone_at(b[1] + DIVIDER_W + 0.1), Zone::File);
+        // 分隔线极窄（0.5pt），归给右段：zone_at 左闭右开，b[1] 即右段起点。
+        assert_eq!(zone_at(b[1]), Zone::File);
+        assert_eq!(zone_at(b[1] + 0.2), Zone::File);
         assert_eq!(zone_at(b[2] - 0.1), Zone::File);
-        // 文件段与拖动留白之间。
+        // 文件段之后是拖动留白。
         assert_eq!(zone_at(b[2]), Zone::Drag);
         assert_eq!(zone_at(b[3] - 0.1), Zone::Drag);
         // × 区从 b[3] 开始直到右缘。
@@ -891,6 +964,16 @@ mod zone_tests {
     fn radius_is_not_a_full_pill() {
         assert_ne!(RADIUS, HEIGHT / 2.0);
         assert!(capsule_width() / HEIGHT > 4.0);
+    }
+
+    /// `down_zone` 以 i8 存储（要能表达「没按下」），还原必须无损。
+    #[test]
+    fn zone_roundtrips_through_i8() {
+        for z in [Zone::Folder, Zone::File, Zone::Close, Zone::Drag] {
+            assert_eq!(Zone::from_i8(z as i8), Some(z));
+        }
+        assert_eq!(Zone::from_i8(-1), None);
+        assert_eq!(Zone::from_i8(4), None);
     }
 }
 
@@ -944,19 +1027,20 @@ mod tests {
 
     #[test]
     fn frame_at_clamps_wide_button_back_inside_the_screen() {
-        // 按钮加宽到 162.5pt 后，旧版本「只要相交就认」的判定会让停在
-        // 1440pt 右缘的按钮有一半落在屏幕外。夹紧后右缘应正好贴住屏幕右缘。
+        // 按钮加宽到 163pt 后，旧版本「只要相交就认」的判定会让停在
+        // 1440pt 右缘的按钮整块跑到屏外（x=1440、宽 163 → 完全不相交）。
+        // 现在按左上角归属 + 夹紧，右缘应正好贴住屏幕右缘。
         let screens = [screen(0.0, 0.0, 1440.0, 900.0)];
-        let size = NSSize::new(162.5, 36.0);
-        let frame = frame_at((1440.0, 134.0), size, &screens).unwrap();
-        assert_eq!(frame.origin.x, 1440.0 - 162.5);
+        let size = NSSize::new(163.0, 36.0);
+        let frame = frame_at((1400.0, 134.0), size, &screens).unwrap();
+        assert_eq!(frame.origin.x, 1440.0 - 163.0);
         assert_eq!(frame.origin.y, 98.0);
     }
 
     #[test]
     fn frame_at_clamps_below_the_bottom_edge() {
         let screens = [screen(0.0, 0.0, 1440.0, 900.0)];
-        let size = NSSize::new(162.5, 36.0);
+        let size = NSSize::new(163.0, 36.0);
         // top_left.y = -20 表示按钮几乎整个在屏幕下方。
         let frame = frame_at((100.0, -20.0), size, &screens).unwrap();
         assert_eq!(frame.origin.y, 0.0);
@@ -966,18 +1050,20 @@ mod tests {
     fn frame_at_leaves_an_onscreen_position_untouched() {
         // 已在屏内的位置不该被夹紧挪动。
         let screens = [screen(0.0, 0.0, 1440.0, 900.0)];
-        let size = NSSize::new(162.5, 36.0);
+        let size = NSSize::new(163.0, 36.0);
         let frame = frame_at((100.0, 500.0), size, &screens).unwrap();
         assert_eq!(frame.origin, NSPoint::new(100.0, 464.0));
     }
 
     #[test]
     fn frame_at_accepts_secondary_screen() {
+        // 多屏：副屏上记忆的位置要能原样还原。
         let screens = [
             screen(0.0, 0.0, 1440.0, 900.0),
             screen(1440.0, 0.0, 1920.0, 1080.0),
         ];
-        let frame = frame_at((1500.0, 534.0), NSSize::new(100.0, 34.0), &screens).unwrap();
-        assert_eq!(frame.origin, NSPoint::new(1500.0, 500.0));
+        let frame = frame_at((1500.0, 534.0), NSSize::new(163.0, 36.0), &screens).unwrap();
+        assert_eq!(frame.origin, NSPoint::new(1500.0, 498.0));
     }
+
 }

@@ -131,10 +131,11 @@ pub fn parse(stdout: &str, mode: Mode) -> Result<Vec<PathBuf>, FinderError> {
             }
             // 选中的全是文件夹（或一个都没选、但脚本没给 W 记录）时，不该交白卷：
             // 回退到前置窗口目录，与 FolderPath 在「无选中项」时的行为对齐。
+            // 这里取 container_path（D 记录），而不是文件夹自身——否则等于把
+            // 「只要文件」又变回「复制文件夹自身」，正是这个模式要避免的。
             if out.is_empty() {
                 for r in &records {
-                    let raw = if r.kind == 'D' { &r.item_path } else { &r.container_path };
-                    let p = strip_trailing_slash(raw);
+                    let p = strip_trailing_slash(&r.container_path);
                     if !out.contains(&p) {
                         out.push(p);
                     }
