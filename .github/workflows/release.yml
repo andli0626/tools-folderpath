@@ -20,9 +20,10 @@ concurrency:
 jobs:
   build-macos:
     name: 编译 (${{ matrix.arch }})
-    # macos-14 是 arm64 runner；x86_64 由 rustup 交叉编译，objc2 系列是纯 Rust 绑定，
-    # 不需要 Intel 机器也能出 Intel 产物。
-    runs-on: macos-14
+    # macos-13 是 Intel runner：aarch64 与 x86_64 都靠 rustup 交叉编译产出，
+    # objc2 系列是纯 Rust 绑定，不需要真机也能出另一架构的产物。
+    # （macos-14 在本环境解析到不支持的 macos-14-arm64-us-default 配置，作业会被判失败。）
+    runs-on: macos-13
     strategy:
       fail-fast: false
       matrix:
@@ -67,7 +68,7 @@ jobs:
   package-macos:
     name: 打包与发布
     needs: build-macos
-    runs-on: macos-14
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
 
