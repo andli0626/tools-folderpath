@@ -4,3 +4,7 @@
 # cargo/tauri 产物：target 通过 CARGO_TARGET_DIR 指到内部盘，这里兜底防误提交
 src-tauri/target/
 src-tauri/gen/schemas/
+
+# dist 是 tauri frontendDist 的占位目录，编译期必须存在，不能入库被忽略
+!dist/
+!dist/index.html

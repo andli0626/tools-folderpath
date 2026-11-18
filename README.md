@@ -48,6 +48,30 @@ cd tools-folderpath
 产物必须装在内部盘的 `~/Applications`，不要留在外置盘：开机自启的 LaunchAgent 会把 `.app`
 的绝对路径写死，开机时盘没挂载自启就静默失效。
 
+### 从 GitHub Actions 取通用包
+
+仓库推 `v*` 标签会触发 `.github/workflows/release.yml`：两个 macOS runner 分别编
+`aarch64-apple-darwin` 与 `x86_64-apple-darwin`，再把两份二进制 `lipo` 成**通用二进制**，
+组装两个 `.app`、打出 dmg 与 zip，并自动创建 GitHub Release。留一份单架构 zip 是给
+只想下对应体积的用户，也便于按机器排查。
+
+产物命名：
+
+```
+CopyPath_<version>_universal.dmg   两个 .app + Applications 软链接（推荐）
+CopyPath_<version>_universal.zip   通用版两个 .app
+CopyPath_<version>_arm64.zip       Apple Silicon 单架构
+CopyPath_<version>_x86_64.zip      Intel 单架构
+```
+
+打包逻辑抽在 `scripts/package-macos.sh`，它只产出发行文件、不装进 `~/Applications`，
+与 `build-app.sh`（本机自用、会替换并重启旧实例）分工不同。CI 不走 `cargo tauri build`，
+理由与 `build-app.sh` 一致：本项目无 Web 前端，bundler 干的活（合并 Info.plist、塞 .icns、
+做 dmg）几条 `plutil`/`hdiutil` 就能等价完成。
+
+注意 `dist/index.html` 不能删也不能 gitignore：`tauri.conf.json` 的 `frontendDist` 指向
+`../dist`，`tauri::generate_context!()` 在编译期会校验该目录存在，缺失就直接 panic。
+
 关于签名：本项目不做开发者证书签名，也不做公证。但 `build-app.sh` 里那次
 `codesign --sign -`（ad-hoc）**不能删** —— 它不是分发签名，而是运行前提，
 Apple Silicon 上未签名的二进制会被内核直接 SIGKILL（实测 exit 137）。

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>CopyPath</title>
+</head>
+<body>
+  <!--
+    CopyPath 是纯原生（AppKit）菜单栏应用，tauri.conf.json 里 windows 为空，
+    不会加载任何页面。这个文件只是给 tauri::generate_context!() 一个真实存在的
+    frontendDist 目录——它要求 "../dist" 存在，否则编译期直接 panic：
+    "The `frontendDist` configuration is set to "../dist" but this path doesn't exist"。
+    不要在 CI 里删掉或 gitignore 它。
+  -->
+</body>
+</html>
