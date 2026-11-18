@@ -10,7 +10,8 @@ Rust + Tauri v2，无 Web 前端（悬浮按钮是原生 AppKit 面板），路�
 
 **开源地址**：<http://192.168.0.200/lil/tools-folderpath>
 
-**要求**：macOS 12.0+，**Apple Silicon**（本机打包只产出 arm64 单架构，不是 universal 包）。
+**要求**：macOS 12.0+，Apple Silicon 与 Intel 都支持。GitHub Release 里的包是
+**universal**（arm64 + x86_64）；本机 `build-app.sh` 仍只产出本机架构。
 
 ## 功能一览
 
@@ -28,10 +29,13 @@ Rust + Tauri v2，无 Web 前端（悬浮按钮是原生 AppKit 面板），路�
 
 ## 安装
 
-本机打包直接产出到 **`~/Downloads/CopyPath_1.3.0_universal.dmg`**（文件名沿用脚本约定，
-实际是 arm64 单架构，见上）。双击挂载，把
-**CopyPath.app 拖到 Applications** 即可（想用工具栏按钮就把 **CopyPath Toolbar.app**
-也一并拖过去）。
+**推荐**：从 [Releases](https://github.com/andli0626/tools-folderpath/releases) 下
+`CopyPath_1.3.0_universal.dmg`，双击挂载，把 **CopyPath.app 拖到 Applications** 即可
+（想用工具栏按钮就把 **CopyPath Toolbar.app** 也一并拖过去）。从浏览器下载的 dmg 带隔离
+属性，首次打开用**右键 → 打开 → 再点一次「打开」**过掉 Gatekeeper。
+
+本机打包则直接产出到 **`~/Downloads/CopyPath_1.3.0_universal.dmg`**（文件名沿用脚本约定，
+实际只有本机那一个架构，见上）。
 
 本机生成的 dmg 不带隔离属性（`com.apple.quarantine`），所以双击就能打开，不需要额外的
 Gatekeeper 步骤。只有当 dmg 经过浏览器下载或隔空投送转到别的机器时才可能被拦，那时用
