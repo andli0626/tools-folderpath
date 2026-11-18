@@ -1,0 +1,19 @@
+name: runner-probe
+
+# 临时探针：确认这台 GitHub 上哪些 macOS runner 标签真的能起跑。
+# 拿到结果后立刻删除本文件。
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, macos-15, macos-15-intel]
+    steps:
+      - run: uname -a && sw_vers
