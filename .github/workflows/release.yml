@@ -13,9 +13,9 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  # 发布不做「新任务顶掉旧任务」：包打一半被取消会留下半套资产，
-  # 也可能让 Release 停在草稿态。同 tag 的重复触发改为排队串行。
-  cancel-in-progress: false
+  # 同一 tag 重复触发时以最新一次为准：既不会被「永远排队不启动」的旧运行堵住，
+  # 也避免两次打包同时往同一个 Release 传同名资产。
+  cancel-in-progress: true
 
 jobs:
   build-macos:
