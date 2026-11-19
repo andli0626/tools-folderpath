@@ -279,8 +279,20 @@ tccutil reset AppleEvents com.lilin.folderpath.toolbar   # 工具栏按钮是独
 - 文件名里含换行的条目会被丢弃并在 stderr 告警，而不是拼进上一条路径。
 - 全局快捷键是编译期常量，没有设置界面。
 
+## 发布页（GitHub Pages）
+
+根目录 `index.html` 是面向外部的产品发布页：单文件、样式内联、图标内联 SVG、
+零第三方 CDN / 字体 / 统计，下载按钮全部指向同源的 `downloads/`。
+
+- 开启 Pages：Settings → Pages → Source 选 `Deploy from a branch` → 分支 `main`、目录 `/ (root)`。
+- 根目录的 `.nojekyll` 不能删：它会跳过 Jekyll，避免下划线或点号目录线上 404。
+- 发版时把 dmg/zip 放进 `downloads/`，文件名与页面里的链接**一起改**，否则按钮 404。
+- 发布前跑 `./scripts/check-site-deps.sh`：扫描境外依赖、Release 链接与 `.nojekyll`。
+- 免费账号的仓库必须是 public；Pages 也禁止当作商业站点或电商使用。
+
 ## 文档
 
+- [产品发布页](index.html) —— 面向外部的 GitHub Pages 页面：下载、能力、触发方式、语义表、安装、手册、FAQ
 - [访达工具栏按钮 · 安装指南](docs/核心功能/访达工具栏按钮-安装指南.md) —— 拖入、首次授权、验证方法、FAQ
 - [访达工具栏按钮 · 实现技术方案](docs/核心功能/访达工具栏按钮-实现技术方案.md) —— 架构、时序、关键技术点
 - [推广落地页](docs/推广/index.html) —— 单文件静态网页，用户视角的产品介绍
